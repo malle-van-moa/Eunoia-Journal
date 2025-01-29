@@ -1,0 +1,476 @@
+== DATE:
+
+    Wednesday, 29. January 2025 at 19:25:01 Central European Standard Time
+    
+    2025-01-29T18:25:01Z
+
+
+
+== PREVIEW UPDATE ERROR:
+
+    SchemeBuildError: Failed to build the scheme “Eunoia-Journal”
+    
+    no such module 'FirebaseFirestoreSwift'
+    
+    Emit Swift module (arm64):
+    /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/JournalEntry.swift:8:8: error: no such module 'FirebaseFirestoreSwift'
+    import FirebaseFirestoreSwift
+           ^
+    
+    
+    Compile JournalEntry.swift (arm64):
+    /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/JournalEntry.swift:8:8: error: no such module 'FirebaseFirestoreSwift'
+    import FirebaseFirestoreSwift
+           ^
+    
+    
+    Compile FirestoreManager.swift (arm64):
+    /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/JournalEntry.swift:8:8: error: no such module 'FirebaseFirestoreSwift'
+    import FirebaseFirestoreSwift
+           ^
+    
+
+
+
+== PREVIEW UPDATE ERROR:
+
+    SchemeBuildError: Failed to build the scheme “Eunoia-Journal”
+    
+    no such module 'FirebaseFirestoreSwift'
+    
+    Emit Swift module (arm64):
+    /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/JournalEntry.swift:8:8: error: no such module 'FirebaseFirestoreSwift'
+    import FirebaseFirestoreSwift
+           ^
+    
+    
+    Compile JournalEntry.swift (arm64):
+    /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/JournalEntry.swift:8:8: error: no such module 'FirebaseFirestoreSwift'
+    import FirebaseFirestoreSwift
+           ^
+    
+    
+    Compile FirestoreManager.swift (arm64):
+    /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/JournalEntry.swift:8:8: error: no such module 'FirebaseFirestoreSwift'
+    import FirebaseFirestoreSwift
+           ^
+    
+
+
+
+== VERSION INFO:
+
+    Tools: 16B40
+    OS:    24C101
+    PID:   45649
+    Model: MacBook Pro
+    Arch:  arm64e
+
+
+
+== ENVIRONMENT:
+
+    openFiles = [
+        /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/ContentView.swift
+    ]
+    wantsNewBuildSystem = true
+    newBuildSystemAvailable = true
+    activeScheme = Eunoia-Journal
+    activeRunDestination = iPhone 16 Pro variant iphonesimulator arm64
+    workspaceArena = [x]
+    buildArena = [x]
+    buildableEntries = [
+        Eunoia-Journal.app
+    ]
+    runMode = JIT Executor
+
+
+
+== SELECTED RUN DESTINATION:
+
+    Simulator - iOS 18.1 | iphonesimulator | arm64 | iPhone 16 Pro | no proxy
+
+
+
+== EXECUTION MODE OVERRIDES:
+
+    Workspace JIT mode user setting: true
+    Falling back to Dynamic Replacement: false
+
+
+
+== PACKAGE RESOLUTION ERRORS:
+
+    
+
+
+
+== REFERENCED SOURCE PACKAGES:
+
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x3526b3450 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/firebase-ios-sdk'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x38aa15830 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/GoogleAppMeasurement'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x11a4c21e0 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/app-check'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x38aa1c520 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/leveldb'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x38aa198e0 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/gtm-session-fetcher'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x38aa12690 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/interop-ios-for-google-sdks'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x3526552b0 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/GoogleUtilities'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x38aa0adf0 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/nanopb'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x3526e39b0 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/swift-protobuf'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x38aa11540 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/abseil-cpp-binary'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x3511edae0 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/promises'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x35210afd0 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/GoogleDataTransport'>
+    <IDESwiftPackageCore.IDESwiftPackageDependency:0x38aa13a00 path:'/Users/FIXCJXC/Library/Developer/Xcode/DerivedData/Eunoia-Journal-cspixzjglpaigdckksfcwbsdbaec/SourcePackages/checkouts/grpc-binary'>
+
+
+
+== JIT LINKAGE:
+
+    
+
+
+
+== SESSION GROUP 3500:
+
+    workspace identifier: WorkspaceIdentifier(identifier: FF9EC714-BD5B-48D8-BAC4-C8A82D0DAEFC)
+    providers: [
+        Preview Provider | Registry-ContentView.swift#1[preview] [Editor(3227)]
+    ]
+    translation units: [
+        /Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/ContentView.swift
+    ]
+    attributes: [
+        Editor(3227):     
+            isAppPreviewEnabled: false
+            destinationMode: automatic
+            previewSettings: [
+                Registry-ContentView.swift#1[preview]:     isEnabled: false
+                    boxedCanvasControlStates: []
+            ]
+    ]
+    session: 3505
+    request sessions: [
+        Registry[Registry-ContentView.swift#1[preview] (line 22)]: not completed
+    ]
+
+
+
+== UPDATE SESSION 3505:
+
+    Start Date: Wednesday, 29. January 2025 at 19:23:48 Central European Standard Time
+    Preview Preflight {
+        UpdaterStore {
+            updaterLimit: single
+            expectedAbandonedIdentifiers: [2995, 3178, 3328, 2664, 2816, 2730, 3042, 3282, 3407]
+        }
+        Simulator {
+            platform: iphonesimulator
+            device: CB37AB43-07AE-4864-8BDA-4B11277E1AB1 iPhone 16 Pro
+            buildNumber: 22B81
+            runtimePath: /Library/Developer/CoreSimulator/Volumes/iOS_22B81/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 18.1.simruntime
+        }
+    }
+    Preview Provider {
+        UpdaterStore {
+            updaterLimit: single
+            expectedAbandonedIdentifiers: [2995, 3178, 3328, 2664, 2816, 2730, 3042, 3282, 3407]
+        }
+        Simulator {
+            platform: iphonesimulator
+            device: CB37AB43-07AE-4864-8BDA-4B11277E1AB1 iPhone 16 Pro
+            buildNumber: 22B81
+            runtimePath: /Library/Developer/CoreSimulator/Volumes/iOS_22B81/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 18.1.simruntime
+        }
+    }
+    Build Graph {
+        Eunoia-Journal.app (#57)
+           FirebaseStorage (#17)
+              FirebaseStorage (#16)
+                 GULEnvironment (#3)
+                    GoogleUtilities-Environment (#2)
+                       third-party-IsAppEncrypted (#1)
+                 GTMSessionFetcherCore (#5)
+                    GTMSessionFetcherCore (#4)
+                 FirebaseCoreExtension (#6)
+                 FirebaseCore (#13)
+                    GULEnvironment (#3)
+                       GoogleUtilities-Environment (#2)
+                          third-party-IsAppEncrypted (#1)
+                    GULLogger (#8)
+                       GoogleUtilities-Logger (#7)
+                          GoogleUtilities-Environment (#2)
+                             third-party-IsAppEncrypted (#1)
+                    FirebaseCoreInternal (#11)
+                       GULNSData (#10)
+                          GoogleUtilities-NSData (#9)
+                    Firebase (#12)
+                 FirebaseAuthInterop (#14)
+                 FirebaseAppCheckInterop (#15)
+           FirebaseFirestore (#32)
+              FirebaseFirestoreTarget (#31)
+                 FirebaseFirestore (#30)
+                    FirebaseCoreExtension (#6)
+                    FirebaseCore (#13)
+                       GULEnvironment (#3)
+                          GoogleUtilities-Environment (#2)
+                             third-party-IsAppEncrypted (#1)
+                       GULLogger (#8)
+                          GoogleUtilities-Logger (#7)
+                             GoogleUtilities-Environment (#2)
+                                third-party-IsAppEncrypted (#1)
+                       FirebaseCoreInternal (#11)
+                          GULNSData (#10)
+                             GoogleUtilities-NSData (#9)
+                       Firebase (#12)
+                    FirebaseAppCheckInterop (#15)
+                    leveldb (#19)
+                       leveldb (#18)
+                    nanopb (#21)
+                       nanopb (#20)
+                    abseil (#23)
+                       abslWrapper (#22)
+                    gRPC-C++ (#27)
+                       grpcppWrapper (#26)
+                          abseil (#23)
+                             abslWrapper (#22)
+                          opensslWrapper (#24)
+                          grpcWrapper (#25)
+                    FirebaseSharedSwift (#28)
+                    FirebaseFirestoreInternalWrapper (#29)
+           FirebaseAuth (#41)
+              FirebaseAuth (#40)
+                 GULEnvironment (#3)
+                    GoogleUtilities-Environment (#2)
+                       third-party-IsAppEncrypted (#1)
+                 GTMSessionFetcherCore (#5)
+                    GTMSessionFetcherCore (#4)
+                 FirebaseCoreExtension (#6)
+                 FirebaseCore (#13)
+                    GULEnvironment (#3)
+                       GoogleUtilities-Environment (#2)
+                          third-party-IsAppEncrypted (#1)
+                    GULLogger (#8)
+                       GoogleUtilities-Logger (#7)
+                          GoogleUtilities-Environment (#2)
+                             third-party-IsAppEncrypted (#1)
+                    FirebaseCoreInternal (#11)
+                       GULNSData (#10)
+                          GoogleUtilities-NSData (#9)
+                    Firebase (#12)
+                 FirebaseAuthInterop (#14)
+                 FirebaseAppCheckInterop (#15)
+                 GULAppDelegateSwizzler (#36)
+                    GoogleUtilities-AppDelegateSwizzler (#35)
+                       GoogleUtilities-Environment (#2)
+                          third-party-IsAppEncrypted (#1)
+                       GoogleUtilities-Logger (#7)
+                          GoogleUtilities-Environment (#2)
+                             third-party-IsAppEncrypted (#1)
+                       GoogleUtilities-Network (#34)
+                          GoogleUtilities-Logger (#7)
+                             GoogleUtilities-Environment (#2)
+                                third-party-IsAppEncrypted (#1)
+                          GoogleUtilities-NSData (#9)
+                          GoogleUtilities-Reachability (#33)
+                             GoogleUtilities-Logger (#7)
+                                GoogleUtilities-Environment (#2)
+                                   third-party-IsAppEncrypted (#1)
+                 FirebaseAuthInternal (#39)
+                    RecaptchaInterop (#38)
+                       RecaptchaInterop (#37)
+           FirebaseAnalytics (#54)
+              FirebaseAnalyticsTarget (#53)
+                 FirebaseAnalyticsWrapper (#52)
+                    GULNSData (#10)
+                       GoogleUtilities-NSData (#9)
+                    FirebaseCore (#13)
+                       GULEnvironment (#3)
+                          GoogleUtilities-Environment (#2)
+                             third-party-IsAppEncrypted (#1)
+                       GULLogger (#8)
+                          GoogleUtilities-Logger (#7)
+                             GoogleUtilities-Environment (#2)
+                                third-party-IsAppEncrypted (#1)
+                       FirebaseCoreInternal (#11)
+                          GULNSData (#10)
+                             GoogleUtilities-NSData (#9)
+                       Firebase (#12)
+                    nanopb (#21)
+                       nanopb (#20)
+                    GULAppDelegateSwizzler (#36)
+                       GoogleUtilities-AppDelegateSwizzler (#35)
+                          GoogleUtilities-Environment (#2)
+                             third-party-IsAppEncrypted (#1)
+                          GoogleUtilities-Logger (#7)
+                             GoogleUtilities-Environment (#2)
+                                third-party-IsAppEncrypted (#1)
+                          GoogleUtilities-Network (#34)
+                             GoogleUtilities-Logger (#7)
+                                GoogleUtilities-Environment (#2)
+                                   third-party-IsAppEncrypted (#1)
+                             GoogleUtilities-NSData (#9)
+                             GoogleUtilities-Reachability (#33)
+                                GoogleUtilities-Logger (#7)
+                                   GoogleUtilities-Environment (#2)
+                                      third-party-IsAppEncrypted (#1)
+                    GULNetwork (#42)
+                       GoogleUtilities-Network (#34)
+                          GoogleUtilities-Logger (#7)
+                             GoogleUtilities-Environment (#2)
+                                third-party-IsAppEncrypted (#1)
+                          GoogleUtilities-NSData (#9)
+                          GoogleUtilities-Reachability (#33)
+                             GoogleUtilities-Logger (#7)
+                                GoogleUtilities-Environment (#2)
+                                   third-party-IsAppEncrypted (#1)
+                    GULMethodSwizzler (#44)
+                       GoogleUtilities-MethodSwizzler (#43)
+                          GoogleUtilities-Logger (#7)
+                             GoogleUtilities-Environment (#2)
+                                third-party-IsAppEncrypted (#1)
+                    GoogleAppMeasurement (#46)
+                       GoogleAppMeasurementTarget (#45)
+                          GULNSData (#10)
+                             GoogleUtilities-NSData (#9)
+                          nanopb (#21)
+                             nanopb (#20)
+                          GULAppDelegateSwizzler (#36)
+                             GoogleUtilities-AppDelegateSwizzler (#35)
+                                GoogleUtilities-Environment (#2)
+                                   third-party-IsAppEncrypted (#1)
+                                GoogleUtilities-Logger (#7)
+                                   GoogleUtilities-Environment (#2)
+                                      third-party-IsAppEncrypted (#1)
+                                GoogleUtilities-Network (#34)
+                                   GoogleUtilities-Logger (#7)
+                                      GoogleUtilities-Environment (#2)
+                                         third-party-IsAppEncrypted (#1)
+                                   GoogleUtilities-NSData (#9)
+                                   GoogleUtilities-Reachability (#33)
+                                      GoogleUtilities-Logger (#7)
+                                         GoogleUtilities-Environment (#2)
+                                            third-party-IsAppEncrypted (#1)
+                          GULNetwork (#42)
+                             GoogleUtilities-Network (#34)
+                                GoogleUtilities-Logger (#7)
+                                   GoogleUtilities-Environment (#2)
+                                      third-party-IsAppEncrypted (#1)
+                                GoogleUtilities-NSData (#9)
+                                GoogleUtilities-Reachability (#33)
+                                   GoogleUtilities-Logger (#7)
+                                      GoogleUtilities-Environment (#2)
+                                         third-party-IsAppEncrypted (#1)
+                          GULMethodSwizzler (#44)
+                             GoogleUtilities-MethodSwizzler (#43)
+                                GoogleUtilities-Logger (#7)
+                                   GoogleUtilities-Environment (#2)
+                                      third-party-IsAppEncrypted (#1)
+                    FirebaseInstallations (#51)
+                       GULEnvironment (#3)
+                          GoogleUtilities-Environment (#2)
+                             third-party-IsAppEncrypted (#1)
+                       FirebaseCore (#13)
+                          GULEnvironment (#3)
+                             GoogleUtilities-Environment (#2)
+                                third-party-IsAppEncrypted (#1)
+                          GULLogger (#8)
+                             GoogleUtilities-Logger (#7)
+                                GoogleUtilities-Environment (#2)
+                                   third-party-IsAppEncrypted (#1)
+                          FirebaseCoreInternal (#11)
+                             GULNSData (#10)
+                                GoogleUtilities-NSData (#9)
+                          Firebase (#12)
+                       GULUserDefaults (#48)
+                          GoogleUtilities-UserDefaults (#47)
+                             GoogleUtilities-Logger (#7)
+                                GoogleUtilities-Environment (#2)
+                                   third-party-IsAppEncrypted (#1)
+                       FBLPromises (#50)
+                          FBLPromises (#49)
+           sourceFile(file:///Users/FIXCJXC/privat/iOS_Apps/Eunoia/Eunoia-Journal/Eunoia-Journal/ContentView.swift -> ContentView.swift) (#55)
+           ContentView.swift (#56)
+    }
+    Update Plan {
+        iOS [arm64 iphonesimulator18.1 iphonesimulator] (iPhone 16 Pro, 9FE498B0-4211-4551-BDC7-0216DFFA467C-iphonesimulator18.1-arm64-iphonesimulator), [], thinning disabled, thunking enabled) {
+            Destination: iPhone 16 Pro 9FE498B0-4211-4551-BDC7-0216DFFA467C | default device for iphonesimulator [
+                Eunoia_Journal app - Previews {
+                    execution point packs [
+                        [source: ContentView.swift, role: Previews] (in Eunoia_Journal)
+                    ]
+                    translation units [
+                        ContentView.swift (in Eunoia-Journal.app)
+                    ]
+                    modules [
+                        Eunoia-Journal.app
+                        FBLPromises
+                        FBLPromises
+                        Firebase
+                        FirebaseAnalytics
+                        FirebaseAnalyticsTarget
+                        FirebaseAnalyticsWrapper
+                        FirebaseAppCheckInterop
+                        FirebaseAuth
+                        FirebaseAuth
+                        FirebaseAuthInternal
+                        FirebaseAuthInterop
+                        FirebaseCore
+                        FirebaseCoreExtension
+                        FirebaseCoreInternal
+                        FirebaseFirestore
+                        FirebaseFirestore
+                        FirebaseFirestoreInternalWrapper
+                        FirebaseFirestoreTarget
+                        FirebaseInstallations
+                        FirebaseSharedSwift
+                        FirebaseStorage
+                        FirebaseStorage
+                        GTMSessionFetcherCore
+                        GTMSessionFetcherCore
+                        GULAppDelegateSwizzler
+                        GULEnvironment
+                        GULLogger
+                        GULMethodSwizzler
+                        GULNSData
+                        GULNetwork
+                        GULUserDefaults
+                        GoogleAppMeasurement
+                        GoogleAppMeasurementTarget
+                        GoogleUtilities-AppDelegateSwizzler
+                        GoogleUtilities-Environment
+                        GoogleUtilities-Logger
+                        GoogleUtilities-MethodSwizzler
+                        GoogleUtilities-NSData
+                        GoogleUtilities-Network
+                        GoogleUtilities-Reachability
+                        GoogleUtilities-UserDefaults
+                        RecaptchaInterop
+                        RecaptchaInterop
+                        abseil
+                        abslWrapper
+                        gRPC-C++
+                        grpcWrapper
+                        grpcppWrapper
+                        leveldb
+                        leveldb
+                        nanopb
+                        nanopb
+                        opensslWrapper
+                        third-party-IsAppEncrypted
+                    ]
+                    jit link description [
+                        Eunoia-Journal.app
+                    ]
+                }
+            ]
+        }
+    }
+
+
+
+== POWER STATE LOGS:
+
+    29.1.2025, 19:02 Received power source state: Battery Powered (lowPowerMode: false, status: unplugged, level: 80%)
+    29.1.2025, 19:02 Broadcasting device power state: Mid Power
+    29.1.2025, 19:02 No device power state user override user default value.Current power state: Mid Power
+
+
