@@ -20,9 +20,23 @@ struct Eunoia_JournalApp: App {
     // Register app delegate for Firebase setup
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     
+    // Create a shared AuthViewModel instance
+    @StateObject private var authViewModel = AuthViewModel()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if authViewModel.isAuthenticated {
+                    MainTabView(authViewModel: authViewModel)
+                } else {
+                    AuthView()
+                        .environmentObject(authViewModel)
+                }
+            }
+            .onAppear {
+                // Start network monitoring
+                _ = NetworkMonitor.shared
+            }
         }
     }
 }

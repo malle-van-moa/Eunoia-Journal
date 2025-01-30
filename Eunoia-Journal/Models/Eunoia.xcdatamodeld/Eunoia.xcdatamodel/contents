@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22522" systemVersion="24.2.0" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    <entity name="JournalEntryEntity" representedClassName="JournalEntryEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="gratitude" optional="YES" attributeType="String"/>
+        <attribute name="highlight" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="learning" optional="YES" attributeType="String"/>
+        <attribute name="learningNuggetAddedToJournal" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="learningNuggetCategory" optional="YES" attributeType="String"/>
+        <attribute name="learningNuggetContent" optional="YES" attributeType="String"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String"/>
+        <attribute name="userId" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="VisionBoardEntity" representedClassName="VisionBoardEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lifestyleDailyRoutine" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleLeisureActivities" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleLivingEnvironment" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleRelationships" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleWorkStyle" optional="YES" attributeType="String"/>
+        <attribute name="personalityAreasOfGrowth" optional="YES" attributeType="String"/>
+        <attribute name="personalityCorePrinciples" optional="YES" attributeType="String"/>
+        <attribute name="personalityHabits" optional="YES" attributeType="String"/>
+        <attribute name="personalityStrengths" optional="YES" attributeType="String"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String"/>
+        <attribute name="userId" optional="YES" attributeType="String"/>
+        <relationship name="goals" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="GoalEntity" inverseName="visionBoard" inverseEntity="GoalEntity"/>
+        <relationship name="personalValues" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PersonalValueEntity" inverseName="visionBoard" inverseEntity="PersonalValueEntity"/>
+    </entity>
+    <entity name="GoalEntity" representedClassName="GoalEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="goalDescription" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="targetDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <relationship name="milestones" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="MilestoneEntity" inverseName="goal" inverseEntity="MilestoneEntity"/>
+        <relationship name="visionBoard" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="VisionBoardEntity" inverseName="goals" inverseEntity="VisionBoardEntity"/>
+    </entity>
+    <entity name="MilestoneEntity" representedClassName="MilestoneEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="isCompleted" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="milestoneDescription" optional="YES" attributeType="String"/>
+        <attribute name="targetDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <relationship name="goal" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="GoalEntity" inverseName="milestones" inverseEntity="GoalEntity"/>
+    </entity>
+    <entity name="PersonalValueEntity" representedClassName="PersonalValueEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="importance" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="valueDescription" optional="YES" attributeType="String"/>
+        <relationship name="visionBoard" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="VisionBoardEntity" inverseName="personalValues" inverseEntity="VisionBoardEntity"/>
+    </entity>
+</model> 
