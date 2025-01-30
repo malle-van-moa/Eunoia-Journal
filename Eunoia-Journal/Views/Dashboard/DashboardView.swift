@@ -6,6 +6,8 @@ struct DashboardView: View {
     @State private var showingMoodPicker = false
     @State private var showingJournalSheet = false
     @State private var showingLastEntries = false
+    @Binding var selectedTab: Int
+    @Binding var showingDashboard: Bool
     
     private let adaptiveColumns = [
         GridItem(.flexible()),
@@ -121,28 +123,40 @@ struct DashboardView: View {
                     // Main Functions Grid
                     LazyVGrid(columns: adaptiveColumns, spacing: 16) {
                         // Journal Card
-                        DashboardCard(
-                            title: "Journal",
-                            systemImage: "book.fill",
-                            gradient: Gradient(colors: [.blue.opacity(0.6), .cyan.opacity(0.6)])
-                        ) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Starte deinen Tag mit Reflexion")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                        ZStack {
+                            DashboardCard(
+                                title: "Journal",
+                                systemImage: "book.fill",
+                                gradient: Gradient(colors: [.blue.opacity(0.6), .cyan.opacity(0.6)])
+                            ) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Starte deinen Tag mit Reflexion")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .frame(height: 120)
+                            
+                            Button(action: {
+                                print("Journal card tapped")  // Debug print
+                                withAnimation {
+                                    showingDashboard = false
+                                }
+                            }) {
+                                Color.clear
                             }
                         }
-                        .onTapGesture {
-                            showingJournalSheet = true
-                        }
-                        .onLongPressGesture {
-                            showingLastEntries = true
+                        .contentShape(Rectangle())
+                        .contextMenu {
+                            Button {
+                                showingLastEntries = true
+                            } label: {
+                                Label("Letzte Einträge", systemImage: "clock")
+                            }
                         }
                         
                         // Vision Board Card
-                        NavigationLink {
-                            VisionBoardView(viewModel: VisionBoardViewModel())
-                        } label: {
+                        ZStack {
                             DashboardCard(
                                 title: "Vision Board",
                                 systemImage: "star.fill",
@@ -154,8 +168,21 @@ struct DashboardView: View {
                                         .foregroundColor(.secondary)
                                 }
                             }
+                            .frame(height: 120)
+                            
+                            Button(action: {
+                                print("Vision Board card tapped")  // Debug print
+                                withAnimation {
+                                    selectedTab = 2
+                                    showingDashboard = false
+                                }
+                            }) {
+                                Color.clear
+                            }
                         }
+                        .contentShape(Rectangle())
                     }
+                    .padding(.horizontal)
                 }
                 .padding()
             }
@@ -310,7 +337,7 @@ struct LastEntriesView: View {
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
-            DashboardView()
+            DashboardView(selectedTab: .constant(0), showingDashboard: .constant(true))
         }
     }
 } 

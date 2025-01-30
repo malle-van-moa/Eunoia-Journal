@@ -46,7 +46,7 @@ struct JournalListView: View {
                 }
             }
         }
-        .navigationTitle("Journal")
+        .navigationTitle(LocalizedStringKey("Journal"))
         .navigationBarItems(
             leading: Button(action: {
                 showingDatePicker.toggle()
@@ -90,7 +90,7 @@ struct StreakBannerView: View {
         HStack {
             Image(systemName: "flame.fill")
                 .foregroundColor(.orange)
-            Text("\(streak) Day Streak")
+            Text(LocalizedStringKey("\(streak) Tage in Folge"))
                 .font(.headline)
             Spacer()
         }
@@ -107,7 +107,7 @@ struct SearchBar: View {
             Image(systemName: "magnifyingglass")
                 .foregroundColor(.gray)
             
-            TextField("Search entries...", text: $text)
+            TextField(LocalizedStringKey("Einträge durchsuchen..."), text: $text)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
         }
     }
@@ -129,13 +129,13 @@ struct JournalEntryRow: View {
             }
             
             if !entry.gratitude.isEmpty {
-                Text("Grateful for: \(entry.gratitude)")
+                Text(LocalizedStringKey("Dankbar für: \(entry.gratitude)"))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
             
             if !entry.highlight.isEmpty {
-                Text("Highlight: \(entry.highlight)")
+                Text(LocalizedStringKey("Highlight: \(entry.highlight)"))
                     .foregroundColor(.secondary)
                     .lineLimit(2)
             }
@@ -151,11 +151,11 @@ struct EmptyStateView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
             
-            Text("No Journal Entries")
+            Text(LocalizedStringKey("Keine Journal Einträge"))
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text("Start writing your first entry by tapping the pencil icon above.")
+            Text(LocalizedStringKey("Tippe auf das Stift-Symbol oben, um deinen ersten Eintrag zu erstellen."))
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .padding(.horizontal)
@@ -172,15 +172,15 @@ struct DatePickerView: View {
     var body: some View {
         NavigationView {
             DatePicker(
-                "Select Date",
+                LocalizedStringKey("Datum auswählen"),
                 selection: $selectedDate,
                 displayedComponents: .date
             )
             .datePickerStyle(GraphicalDatePickerStyle())
             .padding()
-            .navigationTitle("Select Date")
+            .navigationTitle(LocalizedStringKey("Datum auswählen"))
             .navigationBarItems(
-                trailing: Button("Done") {
+                trailing: Button(LocalizedStringKey("Fertig")) {
                     onDateSelected(selectedDate)
                     dismiss()
                 }

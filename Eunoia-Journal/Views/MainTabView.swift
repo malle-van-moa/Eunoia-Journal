@@ -9,35 +9,26 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Journal Tab
+            // Journal Tab with Dashboard
             NavigationView {
-                ZStack {
+                Group {
                     if showingDashboard {
-                        DashboardView()
-                            .toolbar {
-                                ToolbarItem(placement: .principal) {
-                                    Button {
-                                        showingDashboard = true
-                                    } label: {
-                                        Text("Eunoia")
-                                            .font(.title2.bold())
-                                            .foregroundColor(.primary)
-                                    }
-                                }
-                            }
+                        DashboardView(selectedTab: $selectedTab, showingDashboard: $showingDashboard)
                     } else {
                         JournalListView(viewModel: journalViewModel)
-                            .toolbar {
-                                ToolbarItem(placement: .principal) {
-                                    Button {
-                                        showingDashboard = true
-                                    } label: {
-                                        Text("Eunoia")
-                                            .font(.title2.bold())
-                                            .foregroundColor(.primary)
-                                    }
-                                }
+                    }
+                }
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        Button {
+                            withAnimation {
+                                showingDashboard = true
                             }
+                        } label: {
+                            Text("Eunoia")
+                                .font(.title2.bold())
+                                .foregroundColor(.primary)
+                        }
                     }
                 }
             }
@@ -52,7 +43,10 @@ struct MainTabView: View {
                     .toolbar {
                         ToolbarItem(placement: .principal) {
                             Button {
-                                showingDashboard = true
+                                withAnimation {
+                                    selectedTab = 1
+                                    showingDashboard = true
+                                }
                             } label: {
                                 Text("Eunoia")
                                     .font(.title2.bold())
@@ -69,36 +63,24 @@ struct MainTabView: View {
             // Profile Tab
             NavigationView {
                 ProfileView(authViewModel: authViewModel)
-                    .toolbar {
-                        ToolbarItem(placement: .principal) {
-                            Button {
-                                showingDashboard = true
-                            } label: {
-                                Text("Eunoia")
-                                    .font(.title2.bold())
-                                    .foregroundColor(.primary)
-                            }
-                        }
-                    }
             }
             .tabItem {
                 Label(LocalizedStringKey("Profile"), systemImage: "person.fill")
             }
             .tag(3)
         }
-        .onChange(of: selectedTab) { newValue in
-            if newValue == 1 {
-                // Wenn Journal Tab ausgewählt wird und Dashboard aktiv ist, bleibe im Dashboard
-                if !showingDashboard {
-                    showingDashboard = false
-                }
-            } else {
-                // Bei anderen Tabs Dashboard ausblenden
+        .onChange(of: selectedTab) { _, newValue in
+            // Wenn wir zum Journal-Tab wechseln und das Dashboard nicht angezeigt wird,
+            // zeigen wir die JournalListView
+            if newValue == 1 && !showingDashboard {
                 showingDashboard = false
+            }
+            // Wenn wir zu einem anderen Tab wechseln, merken wir uns den Dashboard-Status
+            else if newValue != 1 {
+                // Dashboard-Status bleibt erhalten
             }
         }
         .onAppear {
-            // Load initial data
             journalViewModel.loadJournalEntries()
             visionBoardViewModel.loadVisionBoard()
         }

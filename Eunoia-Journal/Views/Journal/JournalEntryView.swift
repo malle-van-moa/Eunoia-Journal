@@ -16,9 +16,9 @@ struct JournalEntryView: View {
     private let isEditing: Bool
     
     enum JournalField: String {
-        case gratitude = "Gratitude"
+        case gratitude = "Dankbarkeit"
         case highlight = "Highlight"
-        case learning = "Learning"
+        case learning = "Lernen"
     }
     
     init(viewModel: JournalViewModel, entry: JournalEntry? = nil) {
@@ -46,7 +46,7 @@ struct JournalEntryView: View {
                 
                 // Gratitude Section
                 JournalSection(
-                    title: "What are you grateful for today?",
+                    title: LocalizedStringKey("Wofür bist du heute dankbar?"),
                     text: $gratitude,
                     systemImage: "heart.fill",
                     color: .red
@@ -57,7 +57,7 @@ struct JournalEntryView: View {
                 
                 // Highlight Section
                 JournalSection(
-                    title: "What was your highlight today?",
+                    title: LocalizedStringKey("Was war dein Highlight heute?"),
                     text: $highlight,
                     systemImage: "star.fill",
                     color: .yellow
@@ -68,7 +68,7 @@ struct JournalEntryView: View {
                 
                 // Learning Section
                 JournalSection(
-                    title: "What did you learn today?",
+                    title: LocalizedStringKey("Was hast du heute gelernt?"),
                     text: $learning,
                     systemImage: "book.fill",
                     color: .blue
@@ -87,7 +87,7 @@ struct JournalEntryView: View {
                         HStack {
                             Image(systemName: "lightbulb.fill")
                                 .foregroundColor(.yellow)
-                            Text("Get Daily Learning Nugget")
+                            Text(LocalizedStringKey("Tägliche Lernerkenntnis erhalten"))
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundColor(.gray)
@@ -100,9 +100,9 @@ struct JournalEntryView: View {
             }
             .padding()
         }
-        .navigationTitle(isEditing ? "Edit Entry" : "New Entry")
+        .navigationTitle(isEditing ? LocalizedStringKey("Eintrag bearbeiten") : LocalizedStringKey("Neuer Eintrag"))
         .navigationBarItems(
-            leading: Button("Cancel") {
+            leading: Button(LocalizedStringKey("Abbrechen")) {
                 dismiss()
             },
             trailing: HStack {
@@ -114,7 +114,7 @@ struct JournalEntryView: View {
                     }
                 }
                 
-                Button("Save") {
+                Button(LocalizedStringKey("Speichern")) {
                     saveEntry()
                 }
                 .disabled(gratitude.isEmpty && highlight.isEmpty && learning.isEmpty)
@@ -140,16 +140,16 @@ struct JournalEntryView: View {
         .sheet(isPresented: $showingLearningNugget) {
             LearningNuggetPickerView(viewModel: viewModel)
         }
-        .alert("Delete Entry", isPresented: $showingDeleteConfirmation) {
-            Button("Delete", role: .destructive) {
+        .alert(LocalizedStringKey("Eintrag löschen"), isPresented: $showingDeleteConfirmation) {
+            Button(LocalizedStringKey("Löschen"), role: .destructive) {
                 if let entry = entry {
                     viewModel.deleteEntry(entry)
                     dismiss()
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(LocalizedStringKey("Abbrechen"), role: .cancel) {}
         } message: {
-            Text("Are you sure you want to delete this entry? This action cannot be undone.")
+            Text(LocalizedStringKey("Bist du sicher, dass du diesen Eintrag löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden."))
         }
     }
     
@@ -174,7 +174,7 @@ struct JournalEntryView: View {
 // MARK: - Supporting Views
 
 struct JournalSection: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var text: String
     let systemImage: String
     let color: Color
