@@ -1,0 +1,92 @@
+// Auth
+"Sign In" = "Anmelden";
+"Sign Out" = "Abmelden";
+"Create Account" = "Konto erstellen";
+"Continue as Guest" = "Als Gast fortfahren";
+"Forgot Password?" = "Passwort vergessen?";
+"Email" = "E-Mail";
+"Password" = "Passwort";
+"Don't have an account?" = "Noch kein Konto?";
+"Reflect, Grow, Transform" = "Reflektieren, Wachsen, Verwandeln";
+"Are you sure you want to sign out?" = "Möchtest du dich wirklich abmelden?";
+
+// Journal
+"Journal" = "Journal";
+"New Entry" = "Neuer Eintrag";
+"Gratitude" = "Dankbarkeit";
+"Highlight" = "Highlight";
+"Learning" = "Lernen";
+"Daily Learning Nugget" = "Täglicher Lernimpuls";
+
+// Vision Board
+"Vision Board" = "Vision Board";
+"Personal Values" = "Persönliche Werte";
+"Life Goals" = "Lebensziele";
+"Dream Lifestyle" = "Traumlebensstil";
+"Ideal Self" = "Ideales Selbst";
+"Progress" = "Fortschritt";
+"Complete" = "Abschließen";
+"Next" = "Weiter";
+"Back" = "Zurück";
+"Cancel" = "Abbrechen";
+"Yes" = "Ja";
+"No" = "Nein";
+
+// Profile
+"Profile" = "Profil";
+"Account" = "Konto";
+"Notifications" = "Benachrichtigungen";
+"Settings" = "Einstellungen";
+"About" = "Über";
+"Privacy Policy" = "Datenschutz";
+"Contact Support" = "Support kontaktieren";
+"Delete Account" = "Konto löschen";
+"Danger Zone" = "Gefahrenbereich";
+"Deleting your account will permanently remove all your data." = "Das Löschen deines Kontos wird alle deine Daten unwiderruflich entfernen.";
+"This action cannot be undone. All your data will be permanently deleted." = "Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Daten werden unwiderruflich gelöscht.";
+"Delete" = "Löschen";
+
+// Alerts
+"Error" = "Fehler";
+"Success" = "Erfolg";
+"Cancel Exercise?" = "Übung abbrechen?";
+"Your progress will be lost." = "Dein Fortschritt geht verloren.";
+"OK" = "OK";
+
+// App Settings
+"App Settings" = "App-Einstellungen";
+"Journal Reminders" = "Journal-Erinnerungen";
+"Data Management" = "Datenverwaltung";
+"Enable Daily Reminders" = "Tägliche Erinnerungen aktivieren";
+"Reminder Time" = "Erinnerungszeit";
+"Repeat On" = "Wiederholen am";
+"Sunday" = "Sonntag";
+"Monday" = "Montag";
+"Tuesday" = "Dienstag";
+"Wednesday" = "Mittwoch";
+"Thursday" = "Donnerstag";
+"Friday" = "Freitag";
+"Saturday" = "Samstag";
+"Streak Alerts" = "Streak-Benachrichtigungen";
+"Weekly Digest" = "Wöchentliche Zusammenfassung";
+"Done" = "Fertig";
+"Export Data" = "Daten exportieren";
+"Delete All Data" = "Alle Daten löschen";
+"Your data will be exported as a JSON file." = "Ihre Daten werden als JSON-Datei exportiert.";
+"This action cannot be undone. All your journal entries and vision boards will be permanently deleted." = "Diese Aktion kann nicht rückgängig gemacht werden. Alle Ihre Journal-Einträge und Vision Boards werden unwiderruflich gelöscht.";
+
+// Dashboard
+"Dashboard" = "Dashboard";
+"How are you feeling today?" = "Wie fühlst du dich heute?";
+"Your Mood" = "Deine Stimmung";
+"Start your day with reflection" = "Starte deinen Tag mit Reflexion";
+"New Entry" = "Neuer Eintrag";
+"Manifest your vision" = "Manifestiere deine Vision";
+"Edit Board" = "Board bearbeiten";
+"Progress" = "Fortschritt";
+"Start your streak!" = "Starte deine Streak!";
+"days in a row!" = "Tage in Folge!";
+"Daily Challenge" = "Tages-Challenge";
+"Completed" = "Abgeschlossen";
+"Last Entries" = "Letzte Einträge";
+"No entries available" = "Keine Einträge vorhanden"; 

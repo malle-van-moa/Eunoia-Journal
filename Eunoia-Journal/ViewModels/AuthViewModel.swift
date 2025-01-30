@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseAuth
 import Combine
+import FirebaseStorage
 
 class AuthViewModel: ObservableObject {
     @Published var user: User?
@@ -11,17 +12,24 @@ class AuthViewModel: ObservableObject {
     
     private let firebaseService = FirebaseService.shared
     private var cancellables = Set<AnyCancellable>()
+    private var authStateHandler: AuthStateDidChangeListenerHandle?
     
     init() {
         setupAuthStateListener()
     }
     
     private func setupAuthStateListener() {
-        Auth.auth().addStateDidChangeListener { [weak self] _, user in
+        authStateHandler = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             DispatchQueue.main.async {
                 self?.user = user
                 self?.isAuthenticated = user != nil || (self?.isGuestUser ?? false)
             }
+        }
+    }
+    
+    deinit {
+        if let handler = authStateHandler {
+            Auth.auth().removeStateDidChangeListener(handler)
         }
     }
     
@@ -95,6 +103,34 @@ class AuthViewModel: ObservableObject {
                     self.error = error
                     self.isLoading = false
                 }
+            }
+        }
+    }
+    
+    func updateProfileImage(imageData: Data) async {
+        isLoading = true
+        error = nil
+        
+        do {
+            // Upload image to Firebase Storage
+            let storageRef = Storage.storage().reference().child("profile_images/\(user?.uid ?? "")/profile.jpg")
+            _ = try await storageRef.putDataAsync(imageData)
+            
+            // Get download URL
+            let downloadURL = try await storageRef.downloadURL()
+            
+            // Update user profile
+            let changeRequest = user?.createProfileChangeRequest()
+            changeRequest?.photoURL = downloadURL
+            try await changeRequest?.commitChanges()
+            
+            DispatchQueue.main.async {
+                self.isLoading = false
+            }
+        } catch {
+            DispatchQueue.main.async {
+                self.error = error
+                self.isLoading = false
             }
         }
     }

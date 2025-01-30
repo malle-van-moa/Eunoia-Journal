@@ -61,7 +61,7 @@ class SyncManager {
         let request = CoreDataJournalEntry.fetchRequest()
         
         do {
-            let entries = try context.fetch(request)
+            let _ = try context.fetch(request)
             // Weitere Verarbeitung der Einträge...
         } catch {
             print("Fehler beim Abrufen der Einträge: \(error)")

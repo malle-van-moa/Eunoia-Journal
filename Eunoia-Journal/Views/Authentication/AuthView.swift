@@ -37,19 +37,19 @@ struct AuthView: View {
                     
                     // Login Form
                     VStack(spacing: 20) {
-                        TextField("Email", text: $email)
+                        TextField(LocalizedStringKey("Email"), text: $email)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .textContentType(.emailAddress)
                             .autocapitalization(.none)
                         
-                        SecureField("Password", text: $password)
+                        SecureField(LocalizedStringKey("Password"), text: $password)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .textContentType(.password)
                         
                         Button(action: {
                             viewModel.signIn(email: email, password: password)
                         }) {
-                            Text("Sign In")
+                            Text(LocalizedStringKey("Sign In"))
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -59,7 +59,7 @@ struct AuthView: View {
                         }
                         .disabled(viewModel.isLoading)
                         
-                        Button("Forgot Password?") {
+                        Button(LocalizedStringKey("Forgot Password?")) {
                             isShowingResetPassword = true
                         }
                         .foregroundColor(.purple)
@@ -68,10 +68,10 @@ struct AuthView: View {
                     
                     // Sign Up Option
                     VStack {
-                        Text("Don't have an account?")
+                        Text(LocalizedStringKey("Don't have an account?"))
                             .foregroundColor(.secondary)
                         
-                        Button("Create Account") {
+                        Button(LocalizedStringKey("Create Account")) {
                             isShowingSignUp = true
                         }
                         .foregroundColor(.purple)
@@ -82,7 +82,7 @@ struct AuthView: View {
                     Button(action: {
                         viewModel.continueAsGuest()
                     }) {
-                        Text("Continue as Guest")
+                        Text(LocalizedStringKey("Continue as Guest"))
                             .foregroundColor(.gray)
                             .padding(.top)
                     }

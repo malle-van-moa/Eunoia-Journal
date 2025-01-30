@@ -85,7 +85,7 @@ struct GuidedExerciseView: View {
             // Navigation Buttons
             HStack {
                 if currentStep > 0 {
-                    Button("Back") {
+                    Button(LocalizedStringKey("Back")) {
                         withAnimation {
                             currentStep -= 1
                         }
@@ -94,7 +94,7 @@ struct GuidedExerciseView: View {
                 
                 Spacer()
                 
-                Button(currentStep == totalSteps - 1 ? "Complete" : "Next") {
+                Button(currentStep == totalSteps - 1 ? LocalizedStringKey("Complete") : LocalizedStringKey("Next")) {
                     if currentStep == totalSteps - 1 {
                         completeExercise()
                     } else {
@@ -108,17 +108,17 @@ struct GuidedExerciseView: View {
             .padding()
         }
         .navigationTitle(exercise.rawValue)
-        .navigationBarItems(trailing: Button("Cancel") {
+        .navigationBarItems(trailing: Button(LocalizedStringKey("Cancel")) {
             showingConfirmation = true
         })
-        .alert("Cancel Exercise?", isPresented: $showingConfirmation) {
-            Button("Yes", role: .destructive) {
+        .alert(LocalizedStringKey("Cancel Exercise?"), isPresented: $showingConfirmation) {
+            Button(LocalizedStringKey("Yes"), role: .destructive) {
                 viewModel.currentExercise = nil
                 dismiss()
             }
-            Button("No", role: .cancel) {}
+            Button(LocalizedStringKey("No"), role: .cancel) {}
         } message: {
-            Text("Your progress will be lost.")
+            Text(LocalizedStringKey("Your progress will be lost."))
         }
     }
     

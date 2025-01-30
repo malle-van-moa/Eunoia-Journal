@@ -1,0 +1,93 @@
+// Auth
+"Sign In" = "Sign In";
+"Sign Out" = "Sign Out";
+"Create Account" = "Create Account";
+"Continue as Guest" = "Continue as Guest";
+"Forgot Password?" = "Forgot Password?";
+"Email" = "Email";
+"Password" = "Password";
+"Don't have an account?" = "Don't have an account?";
+"Reflect, Grow, Transform" = "Reflect, Grow, Transform";
+"Are you sure you want to sign out?" = "Are you sure you want to sign out?";
+
+// Journal
+"Journal" = "Journal";
+"New Entry" = "New Entry";
+"Gratitude" = "Gratitude";
+"Highlight" = "Highlight";
+"Learning" = "Learning";
+"Daily Learning Nugget" = "Daily Learning Nugget";
+
+// Vision Board
+"Vision Board" = "Vision Board";
+"Personal Values" = "Personal Values";
+"Life Goals" = "Life Goals";
+"Dream Lifestyle" = "Dream Lifestyle";
+"Ideal Self" = "Ideal Self";
+"Progress" = "Progress";
+"Complete" = "Complete";
+"Next" = "Next";
+"Back" = "Back";
+"Cancel" = "Cancel";
+"Yes" = "Yes";
+"No" = "No";
+
+// Profile
+"Profile" = "Profile";
+"Account" = "Account";
+"Notifications" = "Notifications";
+"Settings" = "Settings";
+"About" = "About";
+"Privacy Policy" = "Privacy Policy";
+"Contact Support" = "Contact Support";
+"Delete Account" = "Delete Account";
+"Danger Zone" = "Danger Zone";
+"Deleting your account will permanently remove all your data." = "Deleting your account will permanently remove all your data.";
+"This action cannot be undone. All your data will be permanently deleted." = "This action cannot be undone. All your data will be permanently deleted.";
+"Delete" = "Delete";
+
+// Alerts
+"Error" = "Error";
+"Success" = "Success";
+"Cancel Exercise?" = "Cancel Exercise?";
+"Your progress will be lost." = "Your progress will be lost.";
+"OK" = "OK";
+
+// App Settings
+"App Settings" = "App Settings";
+"Journal Reminders" = "Journal Reminders";
+"Data Management" = "Data Management";
+"Enable Daily Reminders" = "Enable Daily Reminders";
+"Reminder Time" = "Reminder Time";
+"Repeat On" = "Repeat On";
+"Sunday" = "Sunday";
+"Monday" = "Monday";
+"Tuesday" = "Tuesday";
+"Wednesday" = "Wednesday";
+"Thursday" = "Thursday";
+"Friday" = "Friday";
+"Saturday" = "Saturday";
+"Streak Alerts" = "Streak Alerts";
+"Weekly Digest" = "Weekly Digest";
+"Done" = "Done";
+"Export Data" = "Export Data";
+"Delete All Data" = "Delete All Data";
+"Your data will be exported as a JSON file." = "Your data will be exported as a JSON file.";
+"This action cannot be undone. All your journal entries and vision boards will be permanently deleted." = "This action cannot be undone. All your journal entries and vision boards will be permanently deleted.";
+
+// Dashboard
+"Dashboard" = "Dashboard";
+"How are you feeling today?" = "How are you feeling today?";
+"Your Mood" = "Your Mood";
+"Start your day with reflection" = "Start your day with reflection";
+"New Entry" = "New Entry";
+"Manifest your vision" = "Manifest your vision";
+"Edit Board" = "Edit Board";
+"Progress" = "Progress";
+"Start your streak!" = "Start your streak!";
+"days in a row!" = "days in a row!";
+"Daily Challenge" = "Daily Challenge";
+"Completed" = "Completed";
+"Done" = "Done";
+"Last Entries" = "Last Entries";
+"No entries available" = "No entries available"; 

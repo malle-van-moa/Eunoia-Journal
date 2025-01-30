@@ -8,14 +8,15 @@ struct ProfileView: View {
     @State private var showingNotificationSettings = false
     @State private var showingAbout = false
     @State private var showingPrivacyPolicy = false
+    @State private var selectedImage: UIImage?
     
     var body: some View {
         List {
             // Account Section
-            Section("Account") {
+            Section(LocalizedStringKey("Account")) {
                 if let user = authViewModel.user {
                     HStack {
-                        Text("Email")
+                        Text(LocalizedStringKey("Email"))
                         Spacer()
                         Text(user.email ?? "")
                             .foregroundColor(.secondary)
@@ -25,50 +26,50 @@ struct ProfileView: View {
                 Button(role: .destructive) {
                     showingLogoutConfirmation = true
                 } label: {
-                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                    Label(LocalizedStringKey("Sign Out"), systemImage: "rectangle.portrait.and.arrow.right")
                 }
             }
             
             // Notifications Section
-            Section("Notifications") {
+            Section(LocalizedStringKey("Notifications")) {
                 Button {
                     showingNotificationSettings = true
                 } label: {
-                    Label("Notification Settings", systemImage: "bell")
+                    Label(LocalizedStringKey("Settings"), systemImage: "bell")
                 }
             }
             
             // App Settings Section
-            Section("App Settings") {
+            Section(LocalizedStringKey("App Settings")) {
                 NavigationLink {
                     NotificationScheduleView()
                 } label: {
-                    Label("Journal Reminders", systemImage: "clock")
+                    Label(LocalizedStringKey("Journal Reminders"), systemImage: "clock")
                 }
                 
                 NavigationLink {
                     DataManagementView()
                 } label: {
-                    Label("Data Management", systemImage: "externaldrive")
+                    Label(LocalizedStringKey("Data Management"), systemImage: "externaldrive")
                 }
             }
             
             // Information Section
-            Section("Information") {
+            Section(LocalizedStringKey("About")) {
                 Button {
                     showingAbout = true
                 } label: {
-                    Label("About Eunoia", systemImage: "info.circle")
+                    Label(LocalizedStringKey("About"), systemImage: "info.circle")
                 }
                 
                 Button {
                     showingPrivacyPolicy = true
                 } label: {
-                    Label("Privacy Policy", systemImage: "hand.raised")
+                    Label(LocalizedStringKey("Privacy Policy"), systemImage: "lock.shield")
                 }
                 
                 Link(destination: URL(string: "mailto:support@eunoia-app.com")!) {
-                    Label("Contact Support", systemImage: "envelope")
+                    Label(LocalizedStringKey("Contact Support"), systemImage: "envelope")
                 }
             }
             
@@ -77,30 +78,30 @@ struct ProfileView: View {
                 Button(role: .destructive) {
                     showingDeleteConfirmation = true
                 } label: {
-                    Label("Delete Account", systemImage: "person.crop.circle.badge.minus")
+                    Label(LocalizedStringKey("Delete Account"), systemImage: "person.crop.circle.badge.minus")
                 }
             } header: {
                 Text("Danger Zone")
             } footer: {
-                Text("Deleting your account will permanently remove all your data.")
+                Text(LocalizedStringKey("Deleting your account will permanently remove all your data."))
             }
         }
-        .navigationTitle("Profile")
-        .alert("Sign Out", isPresented: $showingLogoutConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Sign Out", role: .destructive) {
+        .navigationTitle(LocalizedStringKey("Profile"))
+        .alert(LocalizedStringKey("Sign Out"), isPresented: $showingLogoutConfirmation) {
+            Button(LocalizedStringKey("Cancel"), role: .cancel) {}
+            Button(LocalizedStringKey("Sign Out"), role: .destructive) {
                 authViewModel.signOut()
             }
         } message: {
-            Text("Are you sure you want to sign out?")
+            Text(LocalizedStringKey("Are you sure you want to sign out?"))
         }
-        .alert("Delete Account", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
+        .alert(LocalizedStringKey("Delete Account"), isPresented: $showingDeleteConfirmation) {
+            Button(LocalizedStringKey("Cancel"), role: .cancel) {}
+            Button(LocalizedStringKey("Delete"), role: .destructive) {
                 // TODO: Implement account deletion
             }
         } message: {
-            Text("This action cannot be undone. All your data will be permanently deleted.")
+            Text(LocalizedStringKey("This action cannot be undone. All your data will be permanently deleted."))
         }
         .sheet(isPresented: $showingNotificationSettings) {
             NavigationView {
@@ -117,6 +118,13 @@ struct ProfileView: View {
                 PrivacyPolicyView()
             }
         }
+        .onChange(of: selectedImage) {
+            if let imageData = selectedImage?.jpegData(compressionQuality: 0.8) {
+                Task {
+                    await authViewModel.updateProfileImage(imageData: imageData)
+                }
+            }
+        }
     }
 }
 
@@ -128,30 +136,30 @@ struct NotificationScheduleView: View {
     @State private var selectedDays: Set<Int> = [1, 2, 3, 4, 5, 6, 7]
     
     let weekdays = [
-        (1, "Sunday"),
-        (2, "Monday"),
-        (3, "Tuesday"),
-        (4, "Wednesday"),
-        (5, "Thursday"),
-        (6, "Friday"),
-        (7, "Saturday")
+        (1, LocalizedStringKey("Sunday")),
+        (2, LocalizedStringKey("Monday")),
+        (3, LocalizedStringKey("Tuesday")),
+        (4, LocalizedStringKey("Wednesday")),
+        (5, LocalizedStringKey("Thursday")),
+        (6, LocalizedStringKey("Friday")),
+        (7, LocalizedStringKey("Saturday"))
     ]
     
     var body: some View {
         Form {
             Section {
-                Toggle("Enable Daily Reminders", isOn: $isEnabled)
+                Toggle(LocalizedStringKey("Enable Daily Reminders"), isOn: $isEnabled)
                 
                 if isEnabled {
                     DatePicker(
-                        "Reminder Time",
+                        LocalizedStringKey("Reminder Time"),
                         selection: $selectedTime,
                         displayedComponents: .hourAndMinute
                     )
                 }
             }
             
-            Section("Repeat On") {
+            Section(LocalizedStringKey("Repeat On")) {
                 ForEach(weekdays, id: \.0) { day in
                     Toggle(day.1, isOn: Binding(
                         get: { selectedDays.contains(day.0) },
@@ -166,9 +174,9 @@ struct NotificationScheduleView: View {
                 }
             }
         }
-        .navigationTitle("Journal Reminders")
-        .onChange(of: isEnabled) { newValue in
-            if newValue {
+        .navigationTitle(LocalizedStringKey("Journal Reminders"))
+        .onChange(of: isEnabled) {
+            if isEnabled {
                 // TODO: Schedule notifications
             } else {
                 // TODO: Cancel notifications
@@ -186,13 +194,13 @@ struct NotificationSettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("Journal Reminders", isOn: $journalReminders)
-                Toggle("Streak Alerts", isOn: $streakAlerts)
-                Toggle("Weekly Digest", isOn: $weeklyDigest)
+                Toggle(LocalizedStringKey("Journal Reminders"), isOn: $journalReminders)
+                Toggle(LocalizedStringKey("Streak Alerts"), isOn: $streakAlerts)
+                Toggle(LocalizedStringKey("Weekly Digest"), isOn: $weeklyDigest)
             }
         }
-        .navigationTitle("Notifications")
-        .navigationBarItems(trailing: Button("Done") {
+        .navigationTitle(LocalizedStringKey("Notifications"))
+        .navigationBarItems(trailing: Button(LocalizedStringKey("Done")) {
             dismiss()
         })
     }
@@ -208,32 +216,32 @@ struct DataManagementView: View {
                 Button {
                     showingExportConfirmation = true
                 } label: {
-                    Label("Export Data", systemImage: "square.and.arrow.up")
+                    Label(LocalizedStringKey("Export Data"), systemImage: "square.and.arrow.up")
                 }
                 
                 Button(role: .destructive) {
                     showingDeleteConfirmation = true
                 } label: {
-                    Label("Delete All Data", systemImage: "trash")
+                    Label(LocalizedStringKey("Delete All Data"), systemImage: "trash")
                 }
             }
         }
-        .navigationTitle("Data Management")
-        .alert("Export Data", isPresented: $showingExportConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Export") {
+        .navigationTitle(LocalizedStringKey("Data Management"))
+        .alert(LocalizedStringKey("Export Data"), isPresented: $showingExportConfirmation) {
+            Button(LocalizedStringKey("Cancel"), role: .cancel) {}
+            Button(LocalizedStringKey("Export")) {
                 // TODO: Implement data export
             }
         } message: {
-            Text("Your data will be exported as a JSON file.")
+            Text(LocalizedStringKey("Your data will be exported as a JSON file."))
         }
-        .alert("Delete All Data", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
+        .alert(LocalizedStringKey("Delete All Data"), isPresented: $showingDeleteConfirmation) {
+            Button(LocalizedStringKey("Cancel"), role: .cancel) {}
+            Button(LocalizedStringKey("Delete"), role: .destructive) {
                 // TODO: Implement data deletion
             }
         } message: {
-            Text("This action cannot be undone. All your journal entries and vision boards will be permanently deleted.")
+            Text(LocalizedStringKey("This action cannot be undone. All your journal entries and vision boards will be permanently deleted."))
         }
     }
 }
