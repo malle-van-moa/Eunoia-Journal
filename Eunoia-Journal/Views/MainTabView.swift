@@ -9,80 +9,51 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Journal Tab with Dashboard
-            NavigationView {
-                Group {
-                    if showingDashboard {
-                        DashboardView(selectedTab: $selectedTab, showingDashboard: $showingDashboard)
-                    } else {
-                        JournalListView(viewModel: journalViewModel)
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        Button {
-                            withAnimation {
-                                showingDashboard = true
-                            }
-                        } label: {
-                            Text("Eunoia")
-                                .font(.title2.bold())
-                                .foregroundColor(.primary)
-                        }
-                    }
+            // Journal/Dashboard Tab
+            NavigationStack {
+                if showingDashboard {
+                    DashboardView(selectedTab: $selectedTab, showingDashboard: $showingDashboard)
+                } else {
+                    JournalListView(viewModel: journalViewModel)
                 }
             }
             .tabItem {
-                Label(LocalizedStringKey("Journal"), systemImage: "book.fill")
+                Image(systemName: "book.fill")
+                Text("Journal")
             }
             .tag(1)
             
             // Vision Board Tab
-            NavigationView {
+            NavigationStack {
                 VisionBoardView(viewModel: visionBoardViewModel)
-                    .toolbar {
-                        ToolbarItem(placement: .principal) {
-                            Button {
-                                withAnimation {
-                                    selectedTab = 1
-                                    showingDashboard = true
-                                }
-                            } label: {
-                                Text("Eunoia")
-                                    .font(.title2.bold())
-                                    .foregroundColor(.primary)
-                            }
-                        }
-                    }
             }
             .tabItem {
-                Label(LocalizedStringKey("Vision Board"), systemImage: "star.fill")
+                Image(systemName: "star.fill")
+                Text("Vision Board")
             }
             .tag(2)
             
             // Profile Tab
-            NavigationView {
+            NavigationStack {
                 ProfileView(authViewModel: authViewModel)
             }
             .tabItem {
-                Label(LocalizedStringKey("Profile"), systemImage: "person.fill")
+                Image(systemName: "person.fill")
+                Text("Profile")
             }
             .tag(3)
-        }
-        .onChange(of: selectedTab) { _, newValue in
-            // Wenn wir zum Journal-Tab wechseln und das Dashboard nicht angezeigt wird,
-            // zeigen wir die JournalListView
-            if newValue == 1 && !showingDashboard {
-                showingDashboard = false
-            }
-            // Wenn wir zu einem anderen Tab wechseln, merken wir uns den Dashboard-Status
-            else if newValue != 1 {
-                // Dashboard-Status bleibt erhalten
-            }
         }
         .onAppear {
             journalViewModel.loadJournalEntries()
             visionBoardViewModel.loadVisionBoard()
+            
+            // TabBar Style konfigurieren
+            if #available(iOS 15.0, *) {
+                let appearance = UITabBarAppearance()
+                appearance.configureWithOpaqueBackground()
+                UITabBar.appearance().scrollEdgeAppearance = appearance
+                UITabBar.appearance().standardAppearance = appearance
+            }
         }
     }
 }

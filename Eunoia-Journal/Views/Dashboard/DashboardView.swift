@@ -9,190 +9,175 @@ struct DashboardView: View {
     @Binding var selectedTab: Int
     @Binding var showingDashboard: Bool
     
-    private let adaptiveColumns = [
-        GridItem(.flexible()),
-        GridItem(.flexible())
-    ]
-    
     var body: some View {
-        ScrollView {
-            ZStack(alignment: .top) {
-                // Background Image
-                Image("watercolor_painting_mountains_lake")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 300)
-                    .clipped()
-                    .overlay(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.clear,
-                                Color(UIColor.systemBackground)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                
-                // Content
-                VStack(spacing: 20) {
-                    // Greeting Card
-                    DashboardCard(
-                        title: viewModel.greeting,
-                        systemImage: "sun.max.fill",
-                        gradient: Gradient(colors: [.orange.opacity(0.6), .yellow.opacity(0.6)])
-                    ) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(viewModel.motivationalMessage)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            
-                            if let mood = viewModel.currentMood {
-                                HStack {
-                                    Text("Deine Stimmung:")
-                                    Text(mood.rawValue)
-                                        .font(.title2)
-                                }
-                            } else {
-                                Button {
-                                    showingMoodPicker = true
-                                } label: {
-                                    Text("Wie fühlst du dich heute?")
-                                        .font(.subheadline)
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
-                        }
-                    }
-                    .background(Color(UIColor.systemBackground).opacity(0.8))
-                    
-                    // Progress Card
-                    DashboardCard(
-                        title: "Fortschritt",
-                        systemImage: "flame.fill",
-                        gradient: Gradient(colors: [.red.opacity(0.6), .orange.opacity(0.6)])
-                    ) {
-                        VStack(spacing: 16) {
-                            StreakIndicatorView(
-                                streakCount: viewModel.streakCount,
-                                isAnimating: viewModel.isStreakAnimating
+        GeometryReader { geometry in
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    // Header
+                    Image("watercolor_painting_mountains_lake")
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: geometry.size.width)
+                        .frame(height: 400)
+                        .overlay(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.clear,
+                                    Color(UIColor.systemBackground).opacity(0.95)
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
                             )
-                            
-                            WeekProgressView(
-                                journaledDays: viewModel.journaledDaysThisWeek,
-                                currentDay: viewModel.currentWeekday
-                            ) { day in
-                                viewModel.checkMissedDay(day)
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .alert("Verpasster Tag", isPresented: $viewModel.showingMissedDayAlert) {
-                        Button("Eintrag nachholen") {
-                            showingJournalSheet = true
-                        }
-                        Button("Abbrechen", role: .cancel) {}
-                    } message: {
-                        if viewModel.lastStreakCount > 0 {
-                            Text("Dein letzter Streak war \(viewModel.lastStreakCount) Tage. Lass uns neu starten!")
-                        } else {
-                            Text("Möchtest du einen Eintrag nachholen?")
-                        }
-                    }
+                        )
                     
-                    // Challenge Card
-                    if let challenge = viewModel.dailyChallenge {
-                        DashboardCard(
-                            title: challenge.title,
-                            systemImage: "trophy.fill",
-                            gradient: Gradient(colors: [.green.opacity(0.6), .mint.opacity(0.6)])
-                        ) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(challenge.description)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                    // Content
+                    VStack(spacing: 12) {
+                        // Cards
+                        VStack(spacing: 12) {
+                            // Greeting Card
+                            DashboardCard(
+                                title: viewModel.greeting,
+                                systemImage: "sun.max.fill",
+                                gradient: Gradient(colors: [.orange.opacity(0.4), .yellow.opacity(0.4)])
+                            ) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(viewModel.motivationalMessage)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    
+                                    if let mood = viewModel.currentMood {
+                                        HStack {
+                                            Text("Deine Stimmung:")
+                                            Text(mood.rawValue)
+                                                .font(.title2)
+                                        }
+                                    } else {
+                                        Button {
+                                            showingMoodPicker = true
+                                        } label: {
+                                            Text("Wie fühlst du dich heute?")
+                                                .font(.subheadline)
+                                                .foregroundColor(.accentColor)
+                                        }
+                                    }
+                                }
+                            }
+                            .background(Color(UIColor.systemBackground).opacity(0.7))
+                            
+                            // Progress Card
+                            DashboardCard(
+                                title: "Fortschritt",
+                                systemImage: "flame.fill",
+                                gradient: Gradient(colors: [.red.opacity(0.4), .orange.opacity(0.4)])
+                            ) {
+                                VStack(spacing: 4) {
+                                    StreakIndicatorView(
+                                        streakCount: viewModel.streakCount,
+                                        isAnimating: viewModel.isStreakAnimating
+                                    )
+                                    .frame(height: 40)
+                                    
+                                    WeekProgressView(
+                                        journaledDays: viewModel.journaledDaysThisWeek,
+                                        currentDay: viewModel.currentWeekday
+                                    ) { day in
+                                        viewModel.checkMissedDay(day)
+                                    }
+                                    .frame(height: 30)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            
+                            // Challenge Card
+                            if let challenge = viewModel.dailyChallenge {
+                                DashboardCard(
+                                    title: challenge.title,
+                                    systemImage: "trophy.fill",
+                                    gradient: Gradient(colors: [.green.opacity(0.4), .mint.opacity(0.4)])
+                                ) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(challenge.description)
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                        
+                                        if challenge.isCompleted {
+                                            Label("Abgeschlossen", systemImage: "checkmark.circle.fill")
+                                                .foregroundColor(.green)
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Main Functions Grid
+                            HStack(spacing: 16) {
+                                // Journal Card
+                                Button {
+                                    print("Journal tapped")
+                                    withAnimation {
+                                        showingDashboard = false
+                                    }
+                                } label: {
+                                    DashboardCard(
+                                        title: "Journal",
+                                        systemImage: "book.fill",
+                                        gradient: Gradient(colors: [.blue.opacity(0.4), .cyan.opacity(0.4)])
+                                    ) {
+                                        Text("Starte deinen Tag mit Reflexion")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .frame(height: 40)
+                                    }
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                                .frame(height: 110)
                                 
-                                if challenge.isCompleted {
-                                    Label("Abgeschlossen", systemImage: "checkmark.circle.fill")
-                                        .foregroundColor(.green)
+                                // Vision Board Card
+                                Button {
+                                    print("Vision Board tapped")
+                                    withAnimation {
+                                        selectedTab = 2
+                                        showingDashboard = false
+                                    }
+                                } label: {
+                                    DashboardCard(
+                                        title: "Vision Board",
+                                        systemImage: "star.fill",
+                                        gradient: Gradient(colors: [.purple.opacity(0.4), .pink.opacity(0.4)])
+                                    ) {
+                                        Text("Manifestiere deine Vision")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(2)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .frame(height: 40)
+                                    }
                                 }
+                                .buttonStyle(PlainButtonStyle())
+                                .frame(minWidth: 0, maxWidth: .infinity)
+                                .frame(height: 110)
                             }
+                            .padding(.horizontal)
                         }
-                    }
-                    
-                    // Main Functions Grid
-                    LazyVGrid(columns: adaptiveColumns, spacing: 16) {
-                        // Journal Card
-                        ZStack {
-                            DashboardCard(
-                                title: "Journal",
-                                systemImage: "book.fill",
-                                gradient: Gradient(colors: [.blue.opacity(0.6), .cyan.opacity(0.6)])
-                            ) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Starte deinen Tag mit Reflexion")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .frame(height: 120)
-                            
-                            Button(action: {
-                                print("Journal card tapped")  // Debug print
-                                withAnimation {
-                                    showingDashboard = false
-                                }
-                            }) {
-                                Color.clear
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .contextMenu {
-                            Button {
-                                showingLastEntries = true
-                            } label: {
-                                Label("Letzte Einträge", systemImage: "clock")
-                            }
-                        }
+                        .padding(.horizontal)
+                        .padding(.top, -100)
                         
-                        // Vision Board Card
-                        ZStack {
-                            DashboardCard(
-                                title: "Vision Board",
-                                systemImage: "star.fill",
-                                gradient: Gradient(colors: [.purple.opacity(0.6), .pink.opacity(0.6)])
-                            ) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Manifestiere deine Vision")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .frame(height: 120)
-                            
-                            Button(action: {
-                                print("Vision Board card tapped")  // Debug print
-                                withAnimation {
-                                    selectedTab = 2
-                                    showingDashboard = false
-                                }
-                            }) {
-                                Color.clear
-                            }
-                        }
-                        .contentShape(Rectangle())
+                        // Zusätzlicher Platz am Ende
+                        Spacer(minLength: 24)
                     }
-                    .padding(.horizontal)
                 }
-                .padding()
             }
         }
+        .ignoresSafeArea(.container, edges: .top)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Button {
                     // Scroll to top and reset any navigation
-                    // This will be handled by the navigation stack
                 } label: {
                     Text("Eunoia")
                         .font(.title2.bold())

@@ -21,8 +21,15 @@ class FirebaseService {
         }
         
         // Perform sign in on the main thread
-        let result = try await MainActor.run {
-            try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+        let result = try await withCheckedThrowingContinuation { continuation in
+            Task { @MainActor in
+                do {
+                    let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
         
         guard let idToken = result.user.idToken?.tokenString else {

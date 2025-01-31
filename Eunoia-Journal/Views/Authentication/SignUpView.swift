@@ -58,6 +58,36 @@ struct SignUpView: View {
                             .font(.caption)
                     }
                     
+                    // Social Sign Up Options
+                    VStack(spacing: 16) {
+                        Text("Or sign up with")
+                            .foregroundColor(.secondary)
+                        
+                        // Sign up with Google
+                        Button(action: {
+                            viewModel.signInWithGoogle()
+                        }) {
+                            HStack {
+                                Image("google_logo")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 24, height: 24)
+                                Text("Sign up with Google")
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                            )
+                        }
+                    }
+                    .padding(.horizontal)
+                    
                     Spacer()
                 }
                 .padding()

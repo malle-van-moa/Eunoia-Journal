@@ -3,8 +3,9 @@ platform :ios, '17.0'
 
 # Prevent framework embedding issues
 install! 'cocoapods',
-         :disable_input_output_paths => true,
-         :preserve_pod_file_structure => true
+         :disable_input_output_paths => false,
+         :preserve_pod_file_structure => true,
+         :generate_multiple_pod_projects => false
 
 target 'Eunoia-Journal' do
   use_frameworks!
@@ -19,17 +20,22 @@ target 'Eunoia-Journal' do
   target 'Eunoia-JournalUITests' do
     inherit! :search_paths
   end
-  
-  # Script phase to handle framework installation using wrapper script
-  script_phase :name => 'Copy Frameworks',
-               :script => '/bin/bash "${SRCROOT}/scripts/copy_frameworks.sh"',
-               :execution_position => :after_compile,
-               :input_files => [],
-               :output_files => [],
-               :show_env_vars_in_log => true
 end
 
 post_install do |installer|
+  # Patch AppAuth to fix main thread issue and deprecated openURL: call
+  installer.pods_project.targets.each do |target|
+    if target.name == 'AppAuth'
+      target.source_build_phase.files.each do |file|
+        if file.file_ref.path == 'Sources/AppAuth/iOS/OIDExternalUserAgentIOS.m'
+          `sed -i '' 's/UIWindow \*window = \[\[UIApplication sharedApplication\] keyWindow\];/UIWindow *window;\\n    dispatch_async(dispatch_get_main_queue(), ^{\\n        window = [[UIApplication sharedApplication] keyWindow];\\n    });\\n    dispatch_sync(dispatch_get_main_queue(), ^{/' "#{installer.sandbox.root}/AppAuth/Sources/AppAuth/iOS/OIDExternalUserAgentIOS.m"`
+        elsif file.file_ref.path == 'Sources/AppAuth/iOS/OIDExternalUserAgentIOSCustomBrowser.m'
+          `sed -i '' 's/\[\[UIApplication sharedApplication\] openURL:requestURL\]/[[UIApplication sharedApplication] openURL:requestURL options:@{} completionHandler:^(BOOL success) { }]/' "#{installer.sandbox.root}/AppAuth/Sources/AppAuth/iOS/OIDExternalUserAgentIOSCustomBrowser.m"`
+        end
+      end
+    end
+  end
+  
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       # Basic settings
@@ -49,9 +55,20 @@ post_install do |installer|
         config.build_settings['INSTALL_PATH'] = '@executable_path/Frameworks'
         config.build_settings['FRAMEWORK_VERSION'] = 'A'
         
-        # Framework script settings
-        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = ['$(inherited)', '${PODS_ROOT}/**', '${PODS_XCFRAMEWORKS_BUILD_DIR}/**']
-        config.build_settings['HEADER_SEARCH_PATHS'] = ['$(inherited)', '${PODS_ROOT}/**']
+        # Framework search paths - simplified and corrected
+        config.build_settings['FRAMEWORK_SEARCH_PATHS'] = [
+          '$(inherited)',
+          '${PODS_ROOT}/**',
+          '${PODS_XCFRAMEWORKS_BUILD_DIR}/**',
+          '$(PLATFORM_DIR)/Developer/Library/Frameworks'
+        ]
+        
+        # Header search paths
+        config.build_settings['HEADER_SEARCH_PATHS'] = [
+          '$(inherited)',
+          '${PODS_ROOT}/**',
+          '${PODS_CONFIGURATION_BUILD_DIR}/**'
+        ]
         
         # Prevent framework code signing issues
         config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
@@ -59,9 +76,13 @@ post_install do |installer|
         config.build_settings['CODE_SIGN_IDENTITY'] = ''
       end
       
-      # Disable script sandboxing for all targets
-      config.build_settings['ENABLE_USER_SCRIPT_SANDBOXING'] = 'NO'
-      config.build_settings['SHELL_SCRIPT_SANDBOXING'] = 'NO'
+      # Script phase settings
+      target.build_phases.each do |build_phase|
+        if build_phase.is_a?(Xcodeproj::Project::Object::PBXShellScriptBuildPhase)
+          build_phase.dependency_file = '$SRCROOT/Pods/Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal-frameworks-${CONFIGURATION}-input-files.xcfilelist'
+          build_phase.output_file = '$SRCROOT/Pods/Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal-frameworks-${CONFIGURATION}-output-files.xcfilelist'
+        end
+      end
     end
   end
 
@@ -70,6 +91,14 @@ post_install do |installer|
     aggregate_target.user_project.native_targets.each do |native_target|
       native_target.build_configurations.each do |config|
         if native_target.name == 'Eunoia-Journal'
+          # Framework search paths for main target
+          config.build_settings['FRAMEWORK_SEARCH_PATHS'] = [
+            '$(inherited)',
+            '${PODS_ROOT}/**',
+            '${PODS_XCFRAMEWORKS_BUILD_DIR}/**',
+            '$(PLATFORM_DIR)/Developer/Library/Frameworks'
+          ]
+          
           # Info.plist settings
           config.build_settings['GENERATE_INFOPLIST_FILE'] = 'YES'
           config.build_settings['INFOPLIST_FILE'] = 'Eunoia-Journal/Info.plist'
@@ -85,13 +114,6 @@ post_install do |installer|
           
           # Linking flags
           config.build_settings['OTHER_LDFLAGS'] = '$(inherited) -ObjC'
-          
-          # Framework search paths
-          config.build_settings['FRAMEWORK_SEARCH_PATHS'] = [
-            '$(inherited)',
-            '${PODS_ROOT}/**',
-            '${PODS_XCFRAMEWORKS_BUILD_DIR}/**'
-          ]
           
           # Fix code signing
           config.build_settings['CODE_SIGN_IDENTITY'] = 'Apple Development'

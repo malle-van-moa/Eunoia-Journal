@@ -25,17 +25,12 @@ struct Eunoia_JournalApp: App {
     
     var body: some Scene {
         WindowGroup {
-            Group {
-                if authViewModel.isAuthenticated {
-                    MainTabView(authViewModel: authViewModel)
-                } else {
-                    AuthView()
-                        .environmentObject(authViewModel)
-                }
-            }
-            .onAppear {
-                // Start network monitoring
-                _ = NetworkMonitor.shared
+            if authViewModel.isAuthenticated {
+                MainTabView(authViewModel: authViewModel)
+                    .tint(.primary)  // Ensure proper tint color for TabBar
+            } else {
+                AuthView()
+                    .environmentObject(authViewModel)
             }
         }
     }

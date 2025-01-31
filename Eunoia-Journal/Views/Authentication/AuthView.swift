@@ -1,11 +1,10 @@
 import SwiftUI
 
 struct AuthView: View {
-    @EnvironmentObject var viewModel: AuthViewModel
-    @State private var isShowingSignUp = false
-    @State private var isShowingResetPassword = false
+    @StateObject private var viewModel = AuthViewModel()
     @State private var email = ""
     @State private var password = ""
+    @State private var showSignUp = false
     
     var body: some View {
         NavigationView {
@@ -19,37 +18,28 @@ struct AuthView: View {
                 .ignoresSafeArea()
                 
                 VStack(spacing: 30) {
-                    // Logo and Title
-                    VStack(spacing: 20) {
-                        Image(systemName: "book.fill")
-                            .font(.system(size: 80))
-                            .foregroundColor(.purple)
-                        
-                        Text("Eunoia Journal")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        
-                        Text("Reflect, Grow, Transform")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 50)
+                    // App Logo or Title
+                    Text("Eunoia")
+                        .font(.system(size: 40, weight: .bold))
+                        .foregroundColor(.purple)
                     
-                    // Login Form
+                    Text("Welcome back!")
+                        .font(.title2)
+                        .fontWeight(.medium)
+                    
+                    // Email and Password Fields
                     VStack(spacing: 20) {
-                        TextField(LocalizedStringKey("Email"), text: $email)
+                        TextField("Email", text: $email)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .textContentType(.emailAddress)
                             .autocapitalization(.none)
                         
-                        SecureField(LocalizedStringKey("Password"), text: $password)
+                        SecureField("Password", text: $password)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                             .textContentType(.password)
                         
-                        Button(action: {
-                            viewModel.signIn(email: email, password: password)
-                        }) {
-                            Text(LocalizedStringKey("Sign In"))
+                        Button(action: signIn) {
+                            Text("Sign In")
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -57,35 +47,53 @@ struct AuthView: View {
                                 .background(Color.purple)
                                 .cornerRadius(10)
                         }
-                        .disabled(viewModel.isLoading)
-                        
-                        Button(LocalizedStringKey("Forgot Password?")) {
-                            isShowingResetPassword = true
-                        }
-                        .foregroundColor(.purple)
+                        .disabled(viewModel.isLoading || !isValidInput)
                     }
                     .padding(.horizontal)
                     
-                    // Sign Up Option
-                    VStack {
-                        Text(LocalizedStringKey("Don't have an account?"))
-                            .foregroundColor(.secondary)
-                        
-                        Button(LocalizedStringKey("Create Account")) {
-                            isShowingSignUp = true
-                        }
-                        .foregroundColor(.purple)
-                        .fontWeight(.semibold)
+                    if !isValidInput {
+                        Text("Please enter your email and password")
+                            .foregroundColor(.red)
+                            .font(.caption)
                     }
                     
-                    // Guest Mode Option
-                    Button(action: {
-                        viewModel.continueAsGuest()
-                    }) {
-                        Text(LocalizedStringKey("Continue as Guest"))
-                            .foregroundColor(.gray)
-                            .padding(.top)
+                    // Social Sign In Options
+                    VStack(spacing: 16) {
+                        Text("Or continue with")
+                            .foregroundColor(.secondary)
+                        
+                        // Sign in with Google
+                        Button(action: {
+                            viewModel.signInWithGoogle()
+                        }) {
+                            HStack {
+                                Image("google_logo")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 24, height: 24)
+                                Text("Sign in with Google")
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.white)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                            )
+                        }
                     }
+                    .padding(.horizontal)
+                    
+                    // Sign Up Link
+                    Button(action: { showSignUp = true }) {
+                        Text("Don't have an account? Sign Up")
+                            .foregroundColor(.purple)
+                            .underline()
+                    }
+                    .padding(.top)
                     
                     Spacer()
                 }
@@ -100,11 +108,8 @@ struct AuthView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 }
             }
-            .sheet(isPresented: $isShowingSignUp) {
+            .sheet(isPresented: $showSignUp) {
                 SignUpView(viewModel: viewModel)
-            }
-            .sheet(isPresented: $isShowingResetPassword) {
-                ResetPasswordView(viewModel: viewModel)
             }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.error != nil },
@@ -115,6 +120,14 @@ struct AuthView: View {
                 Text(viewModel.errorMessage)
             }
         }
+    }
+    
+    private var isValidInput: Bool {
+        !email.isEmpty && !password.isEmpty
+    }
+    
+    private func signIn() {
+        viewModel.signIn(email: email, password: password)
     }
 }
 

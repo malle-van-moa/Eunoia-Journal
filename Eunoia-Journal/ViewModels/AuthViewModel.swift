@@ -2,6 +2,7 @@ import Foundation
 import FirebaseAuth
 import Combine
 import FirebaseStorage
+import AuthenticationServices
 
 class AuthViewModel: ObservableObject {
     @Published var user: User?
@@ -33,46 +34,106 @@ class AuthViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Authentication Methods
+    
     func continueAsGuest() {
-        isGuestUser = true
-        isAuthenticated = true
+        DispatchQueue.main.async { [weak self] in
+            self?.isGuestUser = true
+            self?.isAuthenticated = true
+        }
     }
     
     func signUp(email: String, password: String) {
-        isLoading = true
-        error = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.isLoading = true
+            self?.error = nil
+        }
         
         Task {
             do {
-                self.user = try await firebaseService.signUp(email: email, password: password)
-                DispatchQueue.main.async {
-                    self.isLoading = false
-                    self.isAuthenticated = true
+                let newUser = try await firebaseService.signUp(email: email, password: password)
+                DispatchQueue.main.async { [weak self] in
+                    self?.user = newUser
+                    self?.isLoading = false
+                    self?.isAuthenticated = true
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.error = error
-                    self.isLoading = false
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = error
+                    self?.isLoading = false
                 }
             }
         }
     }
     
     func signIn(email: String, password: String) {
-        isLoading = true
-        error = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.isLoading = true
+            self?.error = nil
+        }
         
         Task {
             do {
-                self.user = try await firebaseService.signIn(email: email, password: password)
-                DispatchQueue.main.async {
-                    self.isLoading = false
-                    self.isAuthenticated = true
+                let signedInUser = try await firebaseService.signIn(email: email, password: password)
+                DispatchQueue.main.async { [weak self] in
+                    self?.user = signedInUser
+                    self?.isLoading = false
+                    self?.isAuthenticated = true
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.error = error
-                    self.isLoading = false
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = error
+                    self?.isLoading = false
+                }
+            }
+        }
+    }
+    
+    func signInWithGoogle() {
+        DispatchQueue.main.async { [weak self] in
+            self?.isLoading = true
+            self?.error = nil
+        }
+        
+        Task {
+            do {
+                let googleUser = try await firebaseService.signInWithGoogle()
+                DispatchQueue.main.async { [weak self] in
+                    self?.user = googleUser
+                    self?.isLoading = false
+                    self?.isAuthenticated = true
+                }
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = error
+                    self?.isLoading = false
+                }
+            }
+        }
+    }
+    
+    func startSignInWithApple() -> ASAuthorizationAppleIDRequest {
+        firebaseService.startSignInWithApple()
+    }
+    
+    func handleSignInWithApple(authorization: ASAuthorization) {
+        DispatchQueue.main.async { [weak self] in
+            self?.isLoading = true
+            self?.error = nil
+        }
+        
+        Task {
+            do {
+                let appleUser = try await firebaseService.handleSignInWithApple(authorization: authorization)
+                DispatchQueue.main.async { [weak self] in
+                    self?.user = appleUser
+                    self?.isLoading = false
+                    self?.isAuthenticated = true
+                }
+            } catch {
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = error
+                    self?.isLoading = false
                 }
             }
         }
@@ -81,35 +142,44 @@ class AuthViewModel: ObservableObject {
     func signOut() {
         do {
             try firebaseService.signOut()
-            self.user = nil
-            self.isAuthenticated = false
+            DispatchQueue.main.async { [weak self] in
+                self?.user = nil
+                self?.isAuthenticated = false
+                self?.isGuestUser = false
+            }
         } catch {
-            self.error = error
+            DispatchQueue.main.async { [weak self] in
+                self?.error = error
+            }
         }
     }
     
     func resetPassword(email: String) {
-        isLoading = true
-        error = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.isLoading = true
+            self?.error = nil
+        }
         
         Task {
             do {
                 try await Auth.auth().sendPasswordReset(withEmail: email)
-                DispatchQueue.main.async {
-                    self.isLoading = false
+                DispatchQueue.main.async { [weak self] in
+                    self?.isLoading = false
                 }
             } catch {
-                DispatchQueue.main.async {
-                    self.error = error
-                    self.isLoading = false
+                DispatchQueue.main.async { [weak self] in
+                    self?.error = error
+                    self?.isLoading = false
                 }
             }
         }
     }
     
     func updateProfileImage(imageData: Data) async {
-        isLoading = true
-        error = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.isLoading = true
+            self?.error = nil
+        }
         
         do {
             // Upload image to Firebase Storage
@@ -124,13 +194,13 @@ class AuthViewModel: ObservableObject {
             changeRequest?.photoURL = downloadURL
             try await changeRequest?.commitChanges()
             
-            DispatchQueue.main.async {
-                self.isLoading = false
+            DispatchQueue.main.async { [weak self] in
+                self?.isLoading = false
             }
         } catch {
-            DispatchQueue.main.async {
-                self.error = error
-                self.isLoading = false
+            DispatchQueue.main.async { [weak self] in
+                self?.error = error
+                self?.isLoading = false
             }
         }
     }
