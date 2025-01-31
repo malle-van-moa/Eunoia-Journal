@@ -11,20 +11,19 @@ class NetworkMonitor: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     private init() {
-        startMonitoring()
+        setupMonitoring()
     }
     
-    private func startMonitoring() {
+    private func setupMonitoring() {
         monitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
                 let wasConnected = self?.isConnected ?? false
                 self?.isConnected = path.status == .satisfied
                 
-                // If connection was restored, trigger sync
-                if !wasConnected && self?.isConnected == true {
-                    Task {
-                        await FirebaseService.shared.syncUnsyncedData()
-                    }
+                // If we just got connected and were previously disconnected
+                if self?.isConnected == true && !wasConnected {
+                    // Sync pending data
+                    FirebaseService.shared.syncLocalData()
                 }
             }
         }
@@ -32,7 +31,7 @@ class NetworkMonitor: ObservableObject {
         monitor.start(queue: queue)
     }
     
-    func stopMonitoring() {
+    deinit {
         monitor.cancel()
     }
 } 

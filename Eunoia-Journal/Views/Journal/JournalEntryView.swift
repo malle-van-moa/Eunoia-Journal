@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 struct JournalEntryView: View {
     @Environment(\.dismiss) private var dismiss
@@ -151,12 +152,30 @@ struct JournalEntryView: View {
         } message: {
             Text(LocalizedStringKey("Bist du sicher, dass du diesen Eintrag löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden."))
         }
+        .alert("Fehler", isPresented: Binding(
+            get: { viewModel.error != nil },
+            set: { if !$0 { viewModel.error = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage)
+        }
     }
     
     private func saveEntry() {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            // Show error alert if not logged in
+            viewModel.error = NSError(
+                domain: "JournalEntryView",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "Bitte melde dich an, um Einträge zu speichern."]
+            )
+            return
+        }
+        
         let updatedEntry = JournalEntry(
             id: entry?.id ?? UUID().uuidString,
-            userId: entry?.userId ?? "",
+            userId: userId,
             date: entry?.date ?? Date(),
             gratitude: gratitude,
             highlight: highlight,

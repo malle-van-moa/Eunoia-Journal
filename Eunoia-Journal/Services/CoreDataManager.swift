@@ -4,20 +4,17 @@ import Foundation
 class CoreDataManager {
     static let shared = CoreDataManager()
     
-    private init() {}
+    private let persistentContainer: NSPersistentContainer
+    private let context: NSManagedObjectContext
     
-    lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: "Eunoia")
-        container.loadPersistentStores { description, error in
+    private init() {
+        persistentContainer = NSPersistentContainer(name: "Eunoia_Journal")
+        persistentContainer.loadPersistentStores { description, error in
             if let error = error {
-                fatalError("Unable to load persistent stores: \(error)")
+                print("Core Data failed to load: \(error.localizedDescription)")
             }
         }
-        return container
-    }()
-    
-    var context: NSManagedObjectContext {
-        persistentContainer.viewContext
+        context = persistentContainer.viewContext
     }
     
     func saveContext() {
@@ -25,58 +22,96 @@ class CoreDataManager {
             do {
                 try context.save()
             } catch {
-                let error = error as NSError
-                fatalError("Unresolved error \(error), \(error.userInfo)")
+                print("Error saving context: \(error)")
             }
         }
     }
     
-    // MARK: - Journal Entry Operations
+    func fetchJournalEntries(for userId: String) -> [JournalEntry] {
+        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        request.predicate = NSPredicate(format: "userId == %@", userId)
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntryEntity.date, ascending: false)]
+        
+        do {
+            let entities = try context.fetch(request)
+            return entities.map { JournalEntry(from: $0) }
+        } catch {
+            print("Error fetching entries: \(error)")
+            return []
+        }
+    }
+    
+    func fetchPendingEntries(for userId: String) -> [JournalEntry] {
+        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            NSPredicate(format: "userId == %@", userId),
+            NSPredicate(format: "syncStatus == %@", SyncStatus.pendingUpload.rawValue)
+        ])
+        
+        do {
+            let entities = try context.fetch(request)
+            return entities.map { JournalEntry(from: $0) }
+        } catch {
+            print("Error fetching pending entries: \(error)")
+            return []
+        }
+    }
     
     func saveJournalEntry(_ entry: JournalEntry) {
-        let entity = JournalEntryEntity(context: context)
-        entity.id = entry.id
-        entity.userId = entry.userId
-        entity.date = entry.date
-        entity.gratitude = entry.gratitude
-        entity.highlight = entry.highlight
-        entity.learning = entry.learning
-        entity.lastModified = entry.lastModified
-        entity.syncStatus = entry.syncStatus.rawValue
-        
-        if let nugget = entry.learningNugget {
-            entity.learningNuggetCategory = nugget.category.rawValue
-            entity.learningNuggetContent = nugget.content
-            entity.learningNuggetAddedToJournal = nugget.isAddedToJournal
-        }
-        
-        saveContext()
-    }
-    
-    func fetchJournalEntries(for userId: String) -> [JournalEntry] {
-        let fetchRequest: NSFetchRequest<JournalEntryEntity> = JournalEntryEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "userId == %@", userId)
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntryEntity.date, ascending: false)]
+        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        request.predicate = NSPredicate(format: "id == %@", entry.id ?? "")
         
         do {
-            let results = try context.fetch(fetchRequest)
-            return results.map { JournalEntry(from: $0) }
+            let results = try context.fetch(request)
+            let entity: JournalEntryEntity
+            
+            if let existingEntity = results.first {
+                // Update existing entity
+                entity = existingEntity
+            } else {
+                // Create new entity
+                entity = JournalEntryEntity(context: context)
+                entity.id = entry.id
+            }
+            
+            // Update properties
+            entity.userId = entry.userId
+            entity.date = entry.date
+            entity.gratitude = entry.gratitude
+            entity.highlight = entry.highlight
+            entity.learning = entry.learning
+            entity.lastModified = entry.lastModified
+            entity.syncStatus = entry.syncStatus.rawValue
+            
+            // Handle learning nugget
+            if let nugget = entry.learningNugget {
+                entity.learningNuggetCategory = nugget.category.rawValue
+                entity.learningNuggetContent = nugget.content
+                entity.learningNuggetAddedToJournal = nugget.isAddedToJournal
+            } else {
+                entity.learningNuggetCategory = nil
+                entity.learningNuggetContent = nil
+                entity.learningNuggetAddedToJournal = false
+            }
+            
+            try context.save()
         } catch {
-            print("Error fetching journal entries: \(error)")
-            return []
+            print("Error saving entry: \(error)")
         }
     }
     
-    func fetchUnsyncedJournalEntries() -> [JournalEntry] {
-        let fetchRequest: NSFetchRequest<JournalEntryEntity> = JournalEntryEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "syncStatus != %@", JournalEntry.SyncStatus.synced.rawValue)
+    func deleteJournalEntry(withId id: String) {
+        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        request.predicate = NSPredicate(format: "id == %@", id)
         
         do {
-            let results = try context.fetch(fetchRequest)
-            return results.map { JournalEntry(from: $0) }
+            let results = try context.fetch(request)
+            if let entity = results.first {
+                context.delete(entity)
+                try context.save()
+            }
         } catch {
-            print("Error fetching unsynced entries: \(error)")
-            return []
+            print("Error deleting entry: \(error)")
         }
     }
     

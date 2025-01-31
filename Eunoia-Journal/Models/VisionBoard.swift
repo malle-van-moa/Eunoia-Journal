@@ -11,12 +11,6 @@ struct VisionBoard: Identifiable, Codable {
     var lifestyleVision: LifestyleVision
     var desiredPersonality: DesiredPersonality
     var syncStatus: SyncStatus
-    
-    enum SyncStatus: String, Codable {
-        case synced
-        case pendingUpload
-        case pendingUpdate
-    }
 }
 
 struct PersonalValue: Identifiable, Codable {

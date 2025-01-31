@@ -71,15 +71,11 @@
 		};
 		67510D552D4AA03900A63CEC /* Eunoia-JournalTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "Eunoia-JournalTests";
 			sourceTree = "<group>";
 		};
 		67510D5F2D4AA03900A63CEC /* Eunoia-JournalUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = "Eunoia-JournalUITests";
 			sourceTree = "<group>";
 		};

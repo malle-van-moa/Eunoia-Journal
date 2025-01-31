@@ -15,11 +15,23 @@ class JournalViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     
     init() {
-        setupSubscriptions()
+        loadJournalEntries() // Load entries immediately
+        setupAuthSubscription()
     }
     
-    private func setupSubscriptions() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+    private func setupAuthSubscription() {
+        // Listen for auth state changes
+        Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
+            if let userId = user?.uid {
+                self?.setupSubscriptions(for: userId)
+                self?.loadJournalEntries()
+            }
+        }
+    }
+    
+    private func setupSubscriptions(for userId: String) {
+        // Cancel existing subscriptions
+        cancellables.removeAll()
         
         // Subscribe to real-time journal entry updates
         firebaseService.observeJournalEntries(for: userId)
@@ -29,9 +41,71 @@ class JournalViewModel: ObservableObject {
                     self.error = error
                 }
             } receiveValue: { [weak self] entries in
-                self?.journalEntries = entries.sorted(by: { $0.date > $1.date })
+                self?.handleNewEntries(entries)
             }
             .store(in: &cancellables)
+            
+        // Subscribe to network status changes
+        NetworkMonitor.shared.$isConnected
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isConnected in
+                if isConnected {
+                    self?.syncPendingEntries()
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func handleNewEntries(_ entries: [JournalEntry]) {
+        // Sort entries by date
+        let sortedEntries = entries.sorted(by: { $0.date > $1.date })
+        
+        // Update Core Data, preserving sync status for pending entries
+        for entry in sortedEntries {
+            if let existingEntry = journalEntries.first(where: { $0.id == entry.id }),
+               existingEntry.syncStatus == .pendingUpload {
+                var updatedEntry = entry
+                updatedEntry.syncStatus = .pendingUpload
+                coreDataManager.saveJournalEntry(updatedEntry)
+            } else {
+                coreDataManager.saveJournalEntry(entry)
+            }
+        }
+        
+        // Update UI
+        DispatchQueue.main.async {
+            self.journalEntries = sortedEntries
+        }
+    }
+    
+    private func syncPendingEntries() {
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        
+        // Get entries that need syncing
+        let pendingEntries = coreDataManager.fetchPendingEntries(for: userId)
+        
+        for entry in pendingEntries {
+            Task {
+                do {
+                    try await firebaseService.saveJournalEntry(entry)
+                    
+                    DispatchQueue.main.async {
+                        // Update local entry status
+                        if let index = self.journalEntries.firstIndex(where: { $0.id == entry.id }) {
+                            var updatedEntry = entry
+                            updatedEntry.syncStatus = .synced
+                            self.journalEntries[index] = updatedEntry
+                            self.coreDataManager.saveJournalEntry(updatedEntry)
+                        }
+                    }
+                } catch {
+                    print("Failed to sync entry: \(error.localizedDescription)")
+                    // Schedule retry after delay
+                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                    try? await firebaseService.saveJournalEntry(entry)
+                }
+            }
+        }
     }
     
     func loadJournalEntries() {
@@ -39,22 +113,29 @@ class JournalViewModel: ObservableObject {
         isLoading = true
         
         // First load from Core Data
-        journalEntries = coreDataManager.fetchJournalEntries(for: userId)
+        let localEntries = coreDataManager.fetchJournalEntries(for: userId)
+        DispatchQueue.main.async {
+            self.journalEntries = localEntries.sorted(by: { $0.date > $1.date })
+        }
         
         // Then fetch from Firebase if online
-        Task {
-            do {
-                let entries = try await firebaseService.fetchJournalEntries(for: userId)
-                DispatchQueue.main.async {
-                    self.journalEntries = entries.sorted(by: { $0.date > $1.date })
-                    self.isLoading = false
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.error = error
-                    self.isLoading = false
+        if NetworkMonitor.shared.isConnected {
+            Task {
+                do {
+                    let entries = try await firebaseService.fetchJournalEntries(for: userId)
+                    DispatchQueue.main.async {
+                        self.handleNewEntries(entries)
+                        self.isLoading = false
+                    }
+                } catch {
+                    DispatchQueue.main.async {
+                        self.error = error
+                        self.isLoading = false
+                    }
                 }
             }
+        } else {
+            isLoading = false
         }
     }
     
@@ -77,27 +158,46 @@ class JournalViewModel: ObservableObject {
     }
     
     func saveEntry(_ entry: JournalEntry) {
+        var entryToSave = entry
+        
+        // Set sync status based on network availability
+        entryToSave.syncStatus = NetworkMonitor.shared.isConnected ? .synced : .pendingUpload
+        
         // Save to Core Data first
-        coreDataManager.saveJournalEntry(entry)
+        coreDataManager.saveJournalEntry(entryToSave)
+        
+        // Update local array immediately
+        DispatchQueue.main.async {
+            if let index = self.journalEntries.firstIndex(where: { $0.id == entryToSave.id }) {
+                self.journalEntries[index] = entryToSave
+            } else {
+                self.journalEntries.insert(entryToSave, at: 0)
+            }
+        }
         
         // If online, sync with Firebase
         if NetworkMonitor.shared.isConnected {
             Task {
                 do {
-                    try await firebaseService.saveJournalEntry(entry)
+                    try await firebaseService.saveJournalEntry(entryToSave)
                 } catch {
                     DispatchQueue.main.async {
                         self.error = error
+                        // Mark for retry and update UI
+                        entryToSave.syncStatus = .pendingUpload
+                        self.coreDataManager.saveJournalEntry(entryToSave)
+                        if let index = self.journalEntries.firstIndex(where: { $0.id == entryToSave.id }) {
+                            self.journalEntries[index] = entryToSave
+                        }
+                    }
+                    
+                    // Schedule retry after delay
+                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
+                    if entryToSave.syncStatus == .pendingUpload {
+                        try? await firebaseService.saveJournalEntry(entryToSave)
                     }
                 }
             }
-        }
-        
-        // Update local array
-        if let index = journalEntries.firstIndex(where: { $0.id == entry.id }) {
-            journalEntries[index] = entry
-        } else {
-            journalEntries.insert(entry, at: 0)
         }
     }
     
