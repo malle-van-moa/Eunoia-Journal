@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
@@ -159,5 +160,24 @@ class AuthenticationService {
                 return "Unable to present authentication flow."
             }
         }
+    }
+}
+
+// MARK: - UIViewController Extension
+private extension UIViewController {
+    func topMostViewController() -> UIViewController {
+        if let presented = self.presentedViewController {
+            return presented.topMostViewController()
+        }
+        
+        if let navigation = self as? UINavigationController {
+            return navigation.visibleViewController?.topMostViewController() ?? navigation
+        }
+        
+        if let tab = self as? UITabBarController {
+            return tab.selectedViewController?.topMostViewController() ?? tab
+        }
+        
+        return self
     }
 } 

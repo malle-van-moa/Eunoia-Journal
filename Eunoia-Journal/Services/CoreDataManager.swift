@@ -36,7 +36,10 @@ class CoreDataManager {
             let entities = try context.fetch(request)
             return entities.map { JournalEntry(from: $0) }
         } catch {
-            print("Error fetching entries: \(error)")
+            // Only log real errors, not empty results
+            if error.localizedDescription != "nilError" {
+                print("Error fetching entries: \(error)")
+            }
             return []
         }
     }
@@ -52,7 +55,10 @@ class CoreDataManager {
             let entities = try context.fetch(request)
             return entities.map { JournalEntry(from: $0) }
         } catch {
-            print("Error fetching pending entries: \(error)")
+            // Only log real errors, not empty results
+            if error.localizedDescription != "nilError" {
+                print("Error fetching pending entries: \(error)")
+            }
             return []
         }
     }
@@ -96,7 +102,10 @@ class CoreDataManager {
             
             try context.save()
         } catch {
-            print("Error saving entry: \(error)")
+            // Only log real errors
+            if error.localizedDescription != "nilError" {
+                print("Error saving entry: \(error)")
+            }
         }
     }
     
@@ -179,7 +188,10 @@ class CoreDataManager {
             let results = try context.fetch(fetchRequest)
             return results.first.map { VisionBoard(from: $0) }
         } catch {
-            print("Error fetching vision board: \(error)")
+            // Only log real errors, not empty results
+            if error.localizedDescription != "nilError" {
+                print("Error fetching vision board: \(error)")
+            }
             return nil
         }
     }
