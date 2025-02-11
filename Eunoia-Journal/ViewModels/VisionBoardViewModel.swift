@@ -9,26 +9,25 @@ class VisionBoardViewModel: ObservableObject {
     @Published var currentExercise: GuidedExercise?
     @Published var exerciseProgress: Double = 0.0
     
-    private let firebaseService = FirebaseService.shared
-    private let coreDataManager = CoreDataManager.shared
+    private let visionBoardService = VisionBoardService.shared
     private var cancellables = Set<AnyCancellable>()
     
     enum GuidedExercise: String, CaseIterable {
-        case values = "Personal Values"
-        case goals = "Life Goals"
-        case lifestyle = "Dream Lifestyle"
-        case personality = "Ideal Self"
+        case values = "Persönliche Werte"
+        case goals = "Lebensziele"
+        case lifestyle = "Traumlebensstil"
+        case personality = "Ideales Selbst"
         
         var description: String {
             switch self {
             case .values:
-                return "Discover and define your core personal values"
+                return "Entdecke und definiere deine Kernwerte"
             case .goals:
-                return "Set meaningful long-term goals for different life areas"
+                return "Setze bedeutungsvolle langfristige Ziele"
             case .lifestyle:
-                return "Visualize your ideal daily life and environment"
+                return "Visualisiere deinen idealen Lebensstil"
             case .personality:
-                return "Define the person you aspire to become"
+                return "Definiere die Person, die du werden möchtest"
             }
         }
     }
@@ -41,7 +40,7 @@ class VisionBoardViewModel: ObservableObject {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
         // Subscribe to real-time vision board updates
-        firebaseService.observeVisionBoard(for: userId)
+        visionBoardService.observeVisionBoard(for: userId)
             .receive(on: DispatchQueue.main)
             .sink { completion in
                 if case .failure(let error) = completion {
@@ -57,13 +56,9 @@ class VisionBoardViewModel: ObservableObject {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         isLoading = true
         
-        // First load from Core Data
-        visionBoard = coreDataManager.fetchVisionBoard(for: userId)
-        
-        // Then fetch from Firebase if online
         Task {
             do {
-                let board = try await firebaseService.fetchVisionBoard(for: userId)
+                let board = try await visionBoardService.fetchVisionBoard(for: userId)
                 DispatchQueue.main.async {
                     self.visionBoard = board
                     self.isLoading = false
@@ -89,49 +84,42 @@ class VisionBoardViewModel: ObservableObject {
             lifestyleVision: LifestyleVision(
                 dailyRoutine: "",
                 livingEnvironment: "",
-                workStyle: "",
-                leisureActivities: [],
-                relationships: ""
+                workLife: "",
+                relationships: "",
+                hobbies: "",
+                health: ""
             ),
             desiredPersonality: DesiredPersonality(
-                corePrinciples: [],
-                strengths: [],
-                areasOfGrowth: [],
-                habits: []
+                traits: "",
+                mindset: "",
+                behaviors: "",
+                skills: "",
+                habits: "",
+                growth: ""
             ),
             syncStatus: .pendingUpload
         )
         
         visionBoard = newBoard
+        saveVisionBoard(newBoard)
     }
     
     func saveVisionBoard(_ board: VisionBoard) {
-        // Save to Core Data first
-        coreDataManager.saveVisionBoard(board)
-        
-        // If online, sync with Firebase
-        if NetworkMonitor.shared.isConnected {
-            Task {
-                do {
-                    try await firebaseService.saveVisionBoard(board)
-                } catch {
-                    DispatchQueue.main.async {
-                        self.error = error
-                    }
+        Task {
+            do {
+                try await visionBoardService.saveVisionBoard(board)
+                DispatchQueue.main.async {
+                    self.visionBoard = board
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.error = error
                 }
             }
         }
-        
-        // Update local property
-        visionBoard = board
     }
     
-    // MARK: - Guided Exercises
-    
-    func startExercise(_ exercise: GuidedExercise) {
-        currentExercise = exercise
-        exerciseProgress = 0.0
-    }
+    // MARK: - Section Updates
     
     func addPersonalValue(_ value: PersonalValue) {
         guard var board = visionBoard else { return }
@@ -165,6 +153,13 @@ class VisionBoardViewModel: ObservableObject {
         saveVisionBoard(board)
     }
     
+    // MARK: - Guided Exercises
+    
+    func startExercise(_ exercise: GuidedExercise) {
+        currentExercise = exercise
+        exerciseProgress = 0.0
+    }
+    
     func completeExercise() {
         currentExercise = nil
         exerciseProgress = 1.0
@@ -180,8 +175,8 @@ class VisionBoardViewModel: ObservableObject {
         
         if !board.personalValues.isEmpty { progress += 1.0 }
         if !board.goals.isEmpty { progress += 1.0 }
-        if !board.lifestyleVision.dailyRoutine.isEmpty { progress += 1.0 }
-        if !board.desiredPersonality.corePrinciples.isEmpty { progress += 1.0 }
+        if !board.lifestyleVision.isEmpty { progress += 1.0 }
+        if !board.desiredPersonality.isEmpty { progress += 1.0 }
         
         return progress / totalSteps
     }

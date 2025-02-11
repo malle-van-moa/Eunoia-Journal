@@ -3,6 +3,10 @@ import SwiftUI
 struct VisionBoardView: View {
     @ObservedObject var viewModel: VisionBoardViewModel
     @State private var showingExercisePicker = false
+    @State private var showingAddValue = false
+    @State private var showingAddGoal = false
+    @State private var showingEditLifestyle = false
+    @State private var showingEditPersonality = false
     
     var body: some View {
         ScrollView {
@@ -14,84 +18,215 @@ struct VisionBoardView: View {
                 if let board = viewModel.visionBoard {
                     // Personal Values Section
                     VisionBoardSection(
-                        title: "Personal Values",
+                        title: "Persönliche Werte",
                         systemImage: "heart.fill",
                         color: .red
                     ) {
                         if board.personalValues.isEmpty {
                             EmptyStateButton(
-                                title: "Define Your Values",
+                                title: "Definiere deine Werte",
                                 exercise: .values
                             ) {
                                 viewModel.startExercise(.values)
                                 showingExercisePicker = true
                             }
                         } else {
-                            PersonalValuesView(values: board.personalValues)
+                            VStack(alignment: .leading, spacing: 15) {
+                                ForEach(board.personalValues) { value in
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        HStack {
+                                            Text(value.name)
+                                                .font(.headline)
+                                            Spacer()
+                                            HStack {
+                                                ForEach(0..<value.importance, id: \.self) { _ in
+                                                    Image(systemName: "star.fill")
+                                                        .foregroundColor(.yellow)
+                                                }
+                                            }
+                                        }
+                                        if !value.description.isEmpty {
+                                            Text(value.description)
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding()
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(10)
+                                }
+                                
+                                Button(action: {
+                                    showingAddValue = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "plus.circle.fill")
+                                        Text("Wert hinzufügen")
+                                    }
+                                }
+                                .padding()
+                            }
                         }
                     }
                     
                     // Goals Section
                     VisionBoardSection(
-                        title: "Life Goals",
+                        title: "Lebensziele",
                         systemImage: "target",
                         color: .orange
                     ) {
                         if board.goals.isEmpty {
                             EmptyStateButton(
-                                title: "Set Your Goals",
+                                title: "Setze deine Ziele",
                                 exercise: .goals
                             ) {
                                 viewModel.startExercise(.goals)
                                 showingExercisePicker = true
                             }
                         } else {
-                            GoalsView(goals: board.goals)
+                            VStack(alignment: .leading, spacing: 15) {
+                                ForEach(board.goals) { goal in
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        HStack {
+                                            Text(goal.title)
+                                                .font(.headline)
+                                            Spacer()
+                                            Text(goal.category.rawValue)
+                                                .font(.caption)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.orange.opacity(0.2))
+                                                .cornerRadius(8)
+                                        }
+                                        if !goal.description.isEmpty {
+                                            Text(goal.description)
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        if let date = goal.targetDate {
+                                            Text("Zieldatum: \(date.formatted(.dateTime.day().month().year()))")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding()
+                                    .background(Color(.systemBackground))
+                                    .cornerRadius(10)
+                                }
+                                
+                                Button(action: {
+                                    showingAddGoal = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "plus.circle.fill")
+                                        Text("Ziel hinzufügen")
+                                    }
+                                }
+                                .padding()
+                            }
                         }
                     }
                     
                     // Lifestyle Vision Section
                     VisionBoardSection(
-                        title: "Dream Lifestyle",
+                        title: "Traumlebensstil",
                         systemImage: "sun.max.fill",
                         color: .yellow
                     ) {
-                        if board.lifestyleVision.dailyRoutine.isEmpty {
+                        if board.lifestyleVision.isEmpty {
                             EmptyStateButton(
-                                title: "Visualize Your Lifestyle",
+                                title: "Visualisiere deinen Lebensstil",
                                 exercise: .lifestyle
                             ) {
                                 viewModel.startExercise(.lifestyle)
                                 showingExercisePicker = true
                             }
                         } else {
-                            LifestyleVisionView(vision: board.lifestyleVision)
+                            VStack(alignment: .leading, spacing: 15) {
+                                if !board.lifestyleVision.dailyRoutine.isEmpty {
+                                    VisionSection(title: "Tagesablauf", text: board.lifestyleVision.dailyRoutine)
+                                }
+                                if !board.lifestyleVision.livingEnvironment.isEmpty {
+                                    VisionSection(title: "Wohnumgebung", text: board.lifestyleVision.livingEnvironment)
+                                }
+                                if !board.lifestyleVision.workLife.isEmpty {
+                                    VisionSection(title: "Arbeitsleben", text: board.lifestyleVision.workLife)
+                                }
+                                if !board.lifestyleVision.relationships.isEmpty {
+                                    VisionSection(title: "Beziehungen", text: board.lifestyleVision.relationships)
+                                }
+                                if !board.lifestyleVision.hobbies.isEmpty {
+                                    VisionSection(title: "Hobbys & Freizeit", text: board.lifestyleVision.hobbies)
+                                }
+                                if !board.lifestyleVision.health.isEmpty {
+                                    VisionSection(title: "Gesundheit & Wohlbefinden", text: board.lifestyleVision.health)
+                                }
+                                
+                                Button(action: {
+                                    showingEditLifestyle = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "pencil.circle.fill")
+                                        Text("Bearbeiten")
+                                    }
+                                }
+                                .padding()
+                            }
                         }
                     }
                     
                     // Desired Personality Section
                     VisionBoardSection(
-                        title: "Ideal Self",
+                        title: "Ideales Selbst",
                         systemImage: "person.fill",
                         color: .blue
                     ) {
-                        if board.desiredPersonality.corePrinciples.isEmpty {
+                        if board.desiredPersonality.isEmpty {
                             EmptyStateButton(
-                                title: "Define Your Ideal Self",
+                                title: "Definiere dein ideales Selbst",
                                 exercise: .personality
                             ) {
                                 viewModel.startExercise(.personality)
                                 showingExercisePicker = true
                             }
                         } else {
-                            DesiredPersonalityView(personality: board.desiredPersonality)
+                            VStack(alignment: .leading, spacing: 15) {
+                                if !board.desiredPersonality.traits.isEmpty {
+                                    VisionSection(title: "Charaktereigenschaften", text: board.desiredPersonality.traits)
+                                }
+                                if !board.desiredPersonality.mindset.isEmpty {
+                                    VisionSection(title: "Denkweise & Einstellung", text: board.desiredPersonality.mindset)
+                                }
+                                if !board.desiredPersonality.behaviors.isEmpty {
+                                    VisionSection(title: "Verhaltensweisen", text: board.desiredPersonality.behaviors)
+                                }
+                                if !board.desiredPersonality.skills.isEmpty {
+                                    VisionSection(title: "Fähigkeiten & Kompetenzen", text: board.desiredPersonality.skills)
+                                }
+                                if !board.desiredPersonality.habits.isEmpty {
+                                    VisionSection(title: "Gewohnheiten", text: board.desiredPersonality.habits)
+                                }
+                                if !board.desiredPersonality.growth.isEmpty {
+                                    VisionSection(title: "Persönliche Entwicklung", text: board.desiredPersonality.growth)
+                                }
+                                
+                                Button(action: {
+                                    showingEditPersonality = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "pencil.circle.fill")
+                                        Text("Bearbeiten")
+                                    }
+                                }
+                                .padding()
+                            }
                         }
                     }
                 } else {
                     Button(action: {
                         viewModel.createNewVisionBoard()
                     }) {
-                        Text("Create Your Vision Board")
+                        Text("Vision Board erstellen")
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
@@ -105,17 +240,24 @@ struct VisionBoardView: View {
             .padding()
         }
         .navigationTitle("Vision Board")
-        .sheet(isPresented: $showingExercisePicker, onDismiss: {
-            // Reset exercise when sheet is dismissed
-            if viewModel.currentExercise == nil {
-                showingExercisePicker = false
-            }
-        }) {
+        .sheet(isPresented: $showingExercisePicker) {
             if let exercise = viewModel.currentExercise {
                 NavigationView {
                     GuidedExerciseView(viewModel: viewModel, exercise: exercise)
                 }
             }
+        }
+        .sheet(isPresented: $showingAddValue) {
+            AddValueView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingAddGoal) {
+            AddGoalView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingEditLifestyle) {
+            EditLifestyleVisionView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingEditPersonality) {
+            EditDesiredPersonalityView(viewModel: viewModel)
         }
     }
 }
@@ -127,13 +269,13 @@ struct ProgressOverviewCard: View {
     
     var body: some View {
         VStack(spacing: 15) {
-            Text("Vision Board Progress")
+            Text("Vision Board Fortschritt")
                 .font(.headline)
             
             ProgressView(value: progress)
                 .progressViewStyle(LinearProgressViewStyle(tint: .purple))
             
-            Text("\(Int(progress * 100))% Complete")
+            Text("\(Int(progress * 100))% Vollständig")
                 .foregroundColor(.secondary)
         }
         .padding()
@@ -199,120 +341,6 @@ struct EmptyStateButton: View {
     }
 }
 
-struct PersonalValuesView: View {
-    let values: [PersonalValue]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(values) { value in
-                VStack(alignment: .leading) {
-                    Text(value.name)
-                        .font(.headline)
-                    Text(value.description)
-                        .foregroundColor(.secondary)
-                    HStack {
-                        ForEach(0..<5) { index in
-                            Image(systemName: index < value.importance ? "star.fill" : "star")
-                                .foregroundColor(.yellow)
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(8)
-            }
-        }
-    }
-}
-
-struct GoalsView: View {
-    let goals: [Goal]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(goals) { goal in
-                VStack(alignment: .leading) {
-                    HStack {
-                        Text(goal.category.rawValue.capitalized)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(categoryColor(for: goal.category).opacity(0.2))
-                            .cornerRadius(8)
-                        Spacer()
-                        if let date = goal.targetDate {
-                            Text(date, style: .date)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    Text(goal.title)
-                        .font(.headline)
-                    Text(goal.description)
-                        .foregroundColor(.secondary)
-                    
-                    if !goal.milestones.isEmpty {
-                        Text("Milestones")
-                            .font(.subheadline)
-                            .padding(.top, 5)
-                        
-                        ForEach(goal.milestones) { milestone in
-                            HStack {
-                                Image(systemName: milestone.isCompleted ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(milestone.isCompleted ? .green : .gray)
-                                Text(milestone.description)
-                                    .strikethrough(milestone.isCompleted)
-                                Spacer()
-                            }
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(.systemBackground))
-                .cornerRadius(8)
-            }
-        }
-    }
-    
-    private func categoryColor(for category: Goal.Category) -> Color {
-        switch category {
-        case .health: return .green
-        case .career: return .blue
-        case .relationships: return .pink
-        case .personal: return .purple
-        case .financial: return .orange
-        case .spiritual: return .yellow
-        }
-    }
-}
-
-struct LifestyleVisionView: View {
-    let vision: LifestyleVision
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            VisionSection(title: "Daily Routine", text: vision.dailyRoutine)
-            VisionSection(title: "Living Environment", text: vision.livingEnvironment)
-            VisionSection(title: "Work Style", text: vision.workStyle)
-            
-            Text("Leisure Activities")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            FlowLayout(items: vision.leisureActivities) { activity in
-                Text(activity)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(Color.blue.opacity(0.2))
-                    .cornerRadius(15)
-            }
-            
-            VisionSection(title: "Relationships", text: vision.relationships)
-        }
-    }
-}
-
 struct VisionSection: View {
     let title: String
     let text: String
@@ -323,49 +351,10 @@ struct VisionSection: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             Text(text)
-        }
-    }
-}
-
-struct FlowLayout<T: Hashable, Content: View>: View {
-    let items: [T]
-    let content: (T) -> Content
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(items, id: \.self) { item in
-                content(item)
-            }
-        }
-    }
-}
-
-struct DesiredPersonalityView: View {
-    let personality: DesiredPersonality
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            PersonalitySection(title: "Core Principles", items: personality.corePrinciples)
-            PersonalitySection(title: "Strengths", items: personality.strengths)
-            PersonalitySection(title: "Areas of Growth", items: personality.areasOfGrowth)
-            PersonalitySection(title: "Habits", items: personality.habits)
-        }
-    }
-}
-
-struct PersonalitySection: View {
-    let title: String
-    let items: [String]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            ForEach(items, id: \.self) { item in
-                Text("• \(item)")
-            }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.systemBackground))
+                .cornerRadius(8)
         }
     }
 }

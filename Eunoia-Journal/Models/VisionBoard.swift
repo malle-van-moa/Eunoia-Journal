@@ -35,11 +35,11 @@ struct PersonalValue: Identifiable, Codable {
 
 struct Goal: Identifiable, Codable {
     var id: String = UUID().uuidString
-    var category: Category
     var title: String
     var description: String
+    var category: Category
     var targetDate: Date?
-    var milestones: [Milestone]
+    var priority: Int
     
     enum Category: String, Codable, CaseIterable {
         case health = "Gesundheit"
@@ -48,6 +48,8 @@ struct Goal: Identifiable, Codable {
         case personal = "Persönlich"
         case financial = "Finanzen"
         case spiritual = "Spiritualität"
+        
+        var localizedName: String { rawValue }
         
         var description: String {
             switch self {
@@ -105,10 +107,10 @@ struct Goal: Identifiable, Codable {
                 ]
             case .spiritual:
                 return [
-                    "Regelmäßige Meditation",
+                    "Meditation praktizieren",
                     "Achtsamkeit üben",
                     "Werte definieren",
-                    "Dankbarkeit praktizieren"
+                    "Sinn finden"
                 ]
             }
         }
@@ -125,71 +127,37 @@ struct Milestone: Identifiable, Codable {
 struct LifestyleVision: Codable {
     var dailyRoutine: String
     var livingEnvironment: String
-    var workStyle: String
-    var leisureActivities: [String]
+    var workLife: String
     var relationships: String
+    var hobbies: String
+    var health: String
     
-    static let leisureExamples = [
-        "Wandern",
-        "Lesen",
-        "Musik",
-        "Sport",
-        "Reisen",
-        "Kochen",
-        "Kunst",
-        "Meditation",
-        "Gärtnern",
-        "Fotografie"
-    ]
+    var isEmpty: Bool {
+        dailyRoutine.isEmpty &&
+        livingEnvironment.isEmpty &&
+        workLife.isEmpty &&
+        relationships.isEmpty &&
+        hobbies.isEmpty &&
+        health.isEmpty
+    }
 }
 
 struct DesiredPersonality: Codable {
-    var corePrinciples: [String]
-    var strengths: [String]
-    var areasOfGrowth: [String]
-    var habits: [String]
+    var traits: String
+    var mindset: String
+    var behaviors: String
+    var skills: String
+    var habits: String
+    var growth: String
     
-    static let corePrincipleExamples = [
-        "Integrität",
-        "Mut",
-        "Mitgefühl",
-        "Kreativität",
-        "Ausdauer",
-        "Offenheit",
-        "Dankbarkeit",
-        "Verantwortung"
-    ]
-    
-    static let strengthExamples = [
-        "Empathie",
-        "Analytisches Denken",
-        "Kommunikation",
-        "Führung",
-        "Kreativität",
-        "Problemlösung",
-        "Teamarbeit",
-        "Anpassungsfähigkeit"
-    ]
-    
-    static let growthExamples = [
-        "Geduld entwickeln",
-        "Besser zuhören",
-        "Grenzen setzen",
-        "Selbstvertrauen stärken",
-        "Stress bewältigen",
-        "Zeit management",
-        "Kommunikation verbessern"
-    ]
-    
-    static let habitExamples = [
-        "Früh aufstehen",
-        "Regelmäßig Sport",
-        "Gesund essen",
-        "Meditation",
-        "Lesen",
-        "Journaling",
-        "Dankbarkeit üben"
-    ]
+    var isEmpty: Bool {
+        traits.isEmpty &&
+        mindset.isEmpty &&
+        behaviors.isEmpty &&
+        skills.isEmpty &&
+        habits.isEmpty &&
+        growth.isEmpty
+    }
 }
 
 // Extension for Core Data conversion
@@ -216,11 +184,11 @@ extension VisionBoard {
             guard let goal = goal as? GoalEntity else { return nil }
             return Goal(
                 id: goal.id ?? UUID().uuidString,
-                category: Goal.Category(rawValue: goal.category ?? "") ?? .personal,
                 title: goal.title ?? "",
                 description: goal.goalDescription ?? "",
+                category: Goal.Category(rawValue: goal.category ?? "") ?? .personal,
                 targetDate: goal.targetDate,
-                milestones: []
+                priority: Int(goal.priority)
             )
         } ?? []
         
@@ -228,17 +196,20 @@ extension VisionBoard {
         self.lifestyleVision = LifestyleVision(
             dailyRoutine: entity.lifestyleDailyRoutine ?? "",
             livingEnvironment: entity.lifestyleLivingEnvironment ?? "",
-            workStyle: entity.lifestyleWorkStyle ?? "",
-            leisureActivities: entity.lifestyleLeisureActivities?.components(separatedBy: ",") ?? [],
-            relationships: entity.lifestyleRelationships ?? ""
+            workLife: entity.lifestyleWorkLife ?? "",
+            relationships: entity.lifestyleRelationships ?? "",
+            hobbies: entity.lifestyleHobbies ?? "",
+            health: entity.lifestyleHealth ?? ""
         )
         
         // Convert desired personality
         self.desiredPersonality = DesiredPersonality(
-            corePrinciples: entity.personalityCorePrinciples?.components(separatedBy: ",") ?? [],
-            strengths: entity.personalityStrengths?.components(separatedBy: ",") ?? [],
-            areasOfGrowth: entity.personalityAreasOfGrowth?.components(separatedBy: ",") ?? [],
-            habits: entity.personalityHabits?.components(separatedBy: ",") ?? []
+            traits: entity.personalityTraits ?? "",
+            mindset: entity.personalityMindset ?? "",
+            behaviors: entity.personalityBehaviors ?? "",
+            skills: entity.personalitySkills ?? "",
+            habits: entity.personalityHabits ?? "",
+            growth: entity.personalityGrowth ?? ""
         )
     }
 } 

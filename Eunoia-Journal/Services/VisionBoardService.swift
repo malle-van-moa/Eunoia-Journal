@@ -38,26 +38,14 @@ class VisionBoardService {
             var goalDict: [String: Any] = [
                 "title": goal.title,
                 "description": goal.description,
-                "category": goal.category.rawValue
+                "category": goal.category.rawValue,
+                "priority": goal.priority
             ]
             
             // Add optional target date if available
             if let targetDate = goal.targetDate {
                 goalDict["targetDate"] = Timestamp(date: targetDate)
             }
-            
-            // Add milestones
-            let milestonesData = goal.milestones.map { milestone -> [String: Any] in
-                var milestoneDict: [String: Any] = [
-                    "description": milestone.description,
-                    "isCompleted": milestone.isCompleted
-                ]
-                if let targetDate = milestone.targetDate {
-                    milestoneDict["targetDate"] = Timestamp(date: targetDate)
-                }
-                return milestoneDict
-            }
-            goalDict["milestones"] = milestonesData
             
             return goalDict
         }
@@ -67,18 +55,21 @@ class VisionBoardService {
         let lifestyleVisionData: [String: Any] = [
             "dailyRoutine": visionBoard.lifestyleVision.dailyRoutine,
             "livingEnvironment": visionBoard.lifestyleVision.livingEnvironment,
-            "workStyle": visionBoard.lifestyleVision.workStyle,
-            "leisureActivities": visionBoard.lifestyleVision.leisureActivities,
-            "relationships": visionBoard.lifestyleVision.relationships
+            "workLife": visionBoard.lifestyleVision.workLife,
+            "relationships": visionBoard.lifestyleVision.relationships,
+            "hobbies": visionBoard.lifestyleVision.hobbies,
+            "health": visionBoard.lifestyleVision.health
         ]
         dict["lifestyleVision"] = lifestyleVisionData
         
         // Convert desired personality
         let desiredPersonalityData: [String: Any] = [
-            "corePrinciples": visionBoard.desiredPersonality.corePrinciples,
-            "strengths": visionBoard.desiredPersonality.strengths,
-            "areasOfGrowth": visionBoard.desiredPersonality.areasOfGrowth,
-            "habits": visionBoard.desiredPersonality.habits
+            "traits": visionBoard.desiredPersonality.traits,
+            "mindset": visionBoard.desiredPersonality.mindset,
+            "behaviors": visionBoard.desiredPersonality.behaviors,
+            "skills": visionBoard.desiredPersonality.skills,
+            "habits": visionBoard.desiredPersonality.habits,
+            "growth": visionBoard.desiredPersonality.growth
         ]
         dict["desiredPersonality"] = desiredPersonalityData
         
@@ -128,34 +119,20 @@ class VisionBoardService {
             guard let title = goalData["title"] as? String,
                   let description = goalData["description"] as? String,
                   let categoryRaw = goalData["category"] as? String,
-                  let category = Goal.Category(rawValue: categoryRaw) else {
+                  let category = Goal.Category(rawValue: categoryRaw),
+                  let priority = goalData["priority"] as? Int else {
                 return nil
             }
             
             // Handle optional target date
             let targetDate = (goalData["targetDate"] as? Timestamp)?.dateValue()
             
-            // Handle milestones
-            let milestonesData = goalData["milestones"] as? [[String: Any]] ?? []
-            let milestones = milestonesData.compactMap { milestoneData -> Milestone? in
-                guard let description = milestoneData["description"] as? String,
-                      let isCompleted = milestoneData["isCompleted"] as? Bool else {
-                    return nil
-                }
-                let targetDate = (milestoneData["targetDate"] as? Timestamp)?.dateValue()
-                return Milestone(
-                    description: description,
-                    isCompleted: isCompleted,
-                    targetDate: targetDate
-                )
-            }
-            
             return Goal(
-                category: category,
                 title: title,
                 description: description,
+                category: category,
                 targetDate: targetDate,
-                milestones: milestones
+                priority: priority
             )
         }
         
@@ -164,45 +141,54 @@ class VisionBoardService {
         if let lifestyleData = data["lifestyleVision"] as? [String: Any],
            let dailyRoutine = lifestyleData["dailyRoutine"] as? String,
            let livingEnvironment = lifestyleData["livingEnvironment"] as? String,
-           let workStyle = lifestyleData["workStyle"] as? String,
-           let leisureActivities = lifestyleData["leisureActivities"] as? [String],
-           let relationships = lifestyleData["relationships"] as? String {
+           let workLife = lifestyleData["workLife"] as? String,
+           let relationships = lifestyleData["relationships"] as? String,
+           let hobbies = lifestyleData["hobbies"] as? String,
+           let health = lifestyleData["health"] as? String {
             lifestyleVision = LifestyleVision(
                 dailyRoutine: dailyRoutine,
                 livingEnvironment: livingEnvironment,
-                workStyle: workStyle,
-                leisureActivities: leisureActivities,
-                relationships: relationships
+                workLife: workLife,
+                relationships: relationships,
+                hobbies: hobbies,
+                health: health
             )
         } else {
             lifestyleVision = LifestyleVision(
                 dailyRoutine: "",
                 livingEnvironment: "",
-                workStyle: "",
-                leisureActivities: [],
-                relationships: ""
+                workLife: "",
+                relationships: "",
+                hobbies: "",
+                health: ""
             )
         }
         
         // Extract desired personality
         let desiredPersonality: DesiredPersonality
         if let personalityData = data["desiredPersonality"] as? [String: Any],
-           let corePrinciples = personalityData["corePrinciples"] as? [String],
-           let strengths = personalityData["strengths"] as? [String],
-           let areasOfGrowth = personalityData["areasOfGrowth"] as? [String],
-           let habits = personalityData["habits"] as? [String] {
+           let traits = personalityData["traits"] as? String,
+           let mindset = personalityData["mindset"] as? String,
+           let behaviors = personalityData["behaviors"] as? String,
+           let skills = personalityData["skills"] as? String,
+           let habits = personalityData["habits"] as? String,
+           let growth = personalityData["growth"] as? String {
             desiredPersonality = DesiredPersonality(
-                corePrinciples: corePrinciples,
-                strengths: strengths,
-                areasOfGrowth: areasOfGrowth,
-                habits: habits
+                traits: traits,
+                mindset: mindset,
+                behaviors: behaviors,
+                skills: skills,
+                habits: habits,
+                growth: growth
             )
         } else {
             desiredPersonality = DesiredPersonality(
-                corePrinciples: [],
-                strengths: [],
-                areasOfGrowth: [],
-                habits: []
+                traits: "",
+                mindset: "",
+                behaviors: "",
+                skills: "",
+                habits: "",
+                growth: ""
             )
         }
         
@@ -267,34 +253,20 @@ class VisionBoardService {
                         guard let title = goalData["title"] as? String,
                               let description = goalData["description"] as? String,
                               let categoryRaw = goalData["category"] as? String,
-                              let category = Goal.Category(rawValue: categoryRaw) else {
+                              let category = Goal.Category(rawValue: categoryRaw),
+                              let priority = goalData["priority"] as? Int else {
                             return nil
                         }
                         
                         // Handle optional target date
                         let targetDate = (goalData["targetDate"] as? Timestamp)?.dateValue()
                         
-                        // Handle milestones
-                        let milestonesData = goalData["milestones"] as? [[String: Any]] ?? []
-                        let milestones = milestonesData.compactMap { milestoneData -> Milestone? in
-                            guard let description = milestoneData["description"] as? String,
-                                  let isCompleted = milestoneData["isCompleted"] as? Bool else {
-                                return nil
-                            }
-                            let targetDate = (milestoneData["targetDate"] as? Timestamp)?.dateValue()
-                            return Milestone(
-                                description: description,
-                                isCompleted: isCompleted,
-                                targetDate: targetDate
-                            )
-                        }
-                        
                         return Goal(
-                            category: category,
                             title: title,
                             description: description,
+                            category: category,
                             targetDate: targetDate,
-                            milestones: milestones
+                            priority: priority
                         )
                     }
                     
@@ -303,45 +275,54 @@ class VisionBoardService {
                     if let lifestyleData = data["lifestyleVision"] as? [String: Any],
                        let dailyRoutine = lifestyleData["dailyRoutine"] as? String,
                        let livingEnvironment = lifestyleData["livingEnvironment"] as? String,
-                       let workStyle = lifestyleData["workStyle"] as? String,
-                       let leisureActivities = lifestyleData["leisureActivities"] as? [String],
-                       let relationships = lifestyleData["relationships"] as? String {
+                       let workLife = lifestyleData["workLife"] as? String,
+                       let relationships = lifestyleData["relationships"] as? String,
+                       let hobbies = lifestyleData["hobbies"] as? String,
+                       let health = lifestyleData["health"] as? String {
                         lifestyleVision = LifestyleVision(
                             dailyRoutine: dailyRoutine,
                             livingEnvironment: livingEnvironment,
-                            workStyle: workStyle,
-                            leisureActivities: leisureActivities,
-                            relationships: relationships
+                            workLife: workLife,
+                            relationships: relationships,
+                            hobbies: hobbies,
+                            health: health
                         )
                     } else {
                         lifestyleVision = LifestyleVision(
                             dailyRoutine: "",
                             livingEnvironment: "",
-                            workStyle: "",
-                            leisureActivities: [],
-                            relationships: ""
+                            workLife: "",
+                            relationships: "",
+                            hobbies: "",
+                            health: ""
                         )
                     }
                     
                     // Extract desired personality
                     let desiredPersonality: DesiredPersonality
                     if let personalityData = data["desiredPersonality"] as? [String: Any],
-                       let corePrinciples = personalityData["corePrinciples"] as? [String],
-                       let strengths = personalityData["strengths"] as? [String],
-                       let areasOfGrowth = personalityData["areasOfGrowth"] as? [String],
-                       let habits = personalityData["habits"] as? [String] {
+                       let traits = personalityData["traits"] as? String,
+                       let mindset = personalityData["mindset"] as? String,
+                       let behaviors = personalityData["behaviors"] as? String,
+                       let skills = personalityData["skills"] as? String,
+                       let habits = personalityData["habits"] as? String,
+                       let growth = personalityData["growth"] as? String {
                         desiredPersonality = DesiredPersonality(
-                            corePrinciples: corePrinciples,
-                            strengths: strengths,
-                            areasOfGrowth: areasOfGrowth,
-                            habits: habits
+                            traits: traits,
+                            mindset: mindset,
+                            behaviors: behaviors,
+                            skills: skills,
+                            habits: habits,
+                            growth: growth
                         )
                     } else {
                         desiredPersonality = DesiredPersonality(
-                            corePrinciples: [],
-                            strengths: [],
-                            areasOfGrowth: [],
-                            habits: []
+                            traits: "",
+                            mindset: "",
+                            behaviors: "",
+                            skills: "",
+                            habits: "",
+                            growth: ""
                         )
                     }
                     

@@ -18,20 +18,23 @@ struct GuidedExerciseView: View {
     @State private var goalDescription = ""
     @State private var goalCategory: Goal.Category = .personal
     @State private var goalDate = Date()
-    @State private var milestones: [String] = [""]
+    @State private var goalPriority = 3
     
     // Lifestyle Vision
     @State private var dailyRoutine = ""
     @State private var livingEnvironment = ""
-    @State private var workStyle = ""
-    @State private var leisureActivities: [String] = [""]
+    @State private var workLife = ""
     @State private var relationships = ""
+    @State private var hobbies = ""
+    @State private var health = ""
     
     // Desired Personality
-    @State private var corePrinciples: [String] = [""]
-    @State private var strengths: [String] = [""]
-    @State private var areasOfGrowth: [String] = [""]
-    @State private var habits: [String] = [""]
+    @State private var traits = ""
+    @State private var mindset = ""
+    @State private var behaviors = ""
+    @State private var skills = ""
+    @State private var habits = ""
+    @State private var growth = ""
     
     var body: some View {
         VStack {
@@ -58,24 +61,27 @@ struct GuidedExerciseView: View {
                             description: $goalDescription,
                             category: $goalCategory,
                             date: $goalDate,
-                            milestones: $milestones
+                            priority: $goalPriority
                         )
                     case .lifestyle:
                         LifestyleExercise(
                             step: currentStep,
                             dailyRoutine: $dailyRoutine,
                             livingEnvironment: $livingEnvironment,
-                            workStyle: $workStyle,
-                            leisureActivities: $leisureActivities,
-                            relationships: $relationships
+                            workLife: $workLife,
+                            relationships: $relationships,
+                            hobbies: $hobbies,
+                            health: $health
                         )
                     case .personality:
                         PersonalityExercise(
                             step: currentStep,
-                            corePrinciples: $corePrinciples,
-                            strengths: $strengths,
-                            areasOfGrowth: $areasOfGrowth,
-                            habits: $habits
+                            traits: $traits,
+                            mindset: $mindset,
+                            behaviors: $behaviors,
+                            skills: $skills,
+                            habits: $habits,
+                            growth: $growth
                         )
                     }
                 }
@@ -145,22 +151,24 @@ struct GuidedExerciseView: View {
             case 1: return !goalDescription.isEmpty
             case 2: return true
             case 3: return true
-            default: return !milestones.contains("")
+            default: return true
             }
         case .lifestyle:
             switch currentStep {
             case 0: return !dailyRoutine.isEmpty
             case 1: return !livingEnvironment.isEmpty
-            case 2: return !workStyle.isEmpty
-            case 3: return !leisureActivities.contains("")
-            default: return !relationships.isEmpty
+            case 2: return !workLife.isEmpty
+            case 3: return !relationships.isEmpty
+            case 4: return !hobbies.isEmpty
+            default: return !health.isEmpty
             }
         case .personality:
             switch currentStep {
-            case 0: return !corePrinciples.contains("")
-            case 1: return !strengths.contains("")
-            case 2: return !areasOfGrowth.contains("")
-            default: return !habits.contains("")
+            case 0: return !traits.isEmpty
+            case 1: return !mindset.isEmpty
+            case 2: return !behaviors.isEmpty
+            case 3: return !skills.isEmpty
+            default: return !habits.isEmpty
             }
         }
     }
@@ -177,11 +185,11 @@ struct GuidedExerciseView: View {
             
         case .goals:
             let goal = Goal(
-                category: goalCategory,
                 title: goalTitle,
                 description: goalDescription,
+                category: goalCategory,
                 targetDate: goalDate,
-                milestones: milestones.filter { !$0.isEmpty }.map { Milestone(description: $0, isCompleted: false) }
+                priority: goalPriority
             )
             viewModel.addGoal(goal)
             
@@ -189,18 +197,21 @@ struct GuidedExerciseView: View {
             let vision = LifestyleVision(
                 dailyRoutine: dailyRoutine,
                 livingEnvironment: livingEnvironment,
-                workStyle: workStyle,
-                leisureActivities: leisureActivities.filter { !$0.isEmpty },
-                relationships: relationships
+                workLife: workLife,
+                relationships: relationships,
+                hobbies: hobbies,
+                health: health
             )
             viewModel.updateLifestyleVision(vision)
             
         case .personality:
             let personality = DesiredPersonality(
-                corePrinciples: corePrinciples.filter { !$0.isEmpty },
-                strengths: strengths.filter { !$0.isEmpty },
-                areasOfGrowth: areasOfGrowth.filter { !$0.isEmpty },
-                habits: habits.filter { !$0.isEmpty }
+                traits: traits,
+                mindset: mindset,
+                behaviors: behaviors,
+                skills: skills,
+                habits: habits,
+                growth: growth
             )
             viewModel.updateDesiredPersonality(personality)
         }
@@ -223,32 +234,43 @@ struct PersonalValuesExercise: View {
             switch step {
             case 0:
                 ExercisePrompt(
-                    title: "Name Your Value",
-                    description: "What personal value would you like to define?",
-                    example: "Example: Authenticity, Growth, Compassion"
+                    title: "Wert benennen",
+                    description: "Welchen persönlichen Wert möchtest du definieren?",
+                    example: "Beispiel: Authentizität, Wachstum, Mitgefühl"
                 )
-                TextField("Value Name", text: $name)
+                TextField("Name des Wertes", text: $name)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                 
             case 1:
                 ExercisePrompt(
-                    title: "Describe Your Value",
-                    description: "What does this value mean to you? How does it guide your actions?",
-                    example: "Example: Being true to myself in all situations..."
+                    title: "Wert beschreiben",
+                    description: "Was bedeutet dieser Wert für dich? Wie beeinflusst er dein Handeln?",
+                    example: "Beispiel: Authentisch zu sein bedeutet für mich..."
                 )
                 TextEditor(text: $description)
-                    .frame(height: 100)
-                    .padding(8)
+                    .frame(height: 150)
+                    .padding(4)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
                 
             case 2:
                 ExercisePrompt(
-                    title: "Rate Importance",
-                    description: "How important is this value to you?",
-                    example: "1 = Less Important, 5 = Most Important"
+                    title: "Wichtigkeit",
+                    description: "Wie wichtig ist dir dieser Wert?",
+                    example: ""
                 )
-                Stepper("Importance: \(importance)", value: $importance, in: 1...5)
+                Picker("Wichtigkeit", selection: $importance) {
+                    ForEach(1...5, id: \.self) { rating in
+                        HStack {
+                            Text("\(rating)")
+                            ForEach(0..<rating, id: \.self) { _ in
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.yellow)
+                            }
+                        }
+                        .tag(rating)
+                    }
+                }
                 
             default:
                 EmptyView()
@@ -263,60 +285,71 @@ struct GoalsExercise: View {
     @Binding var description: String
     @Binding var category: Goal.Category
     @Binding var date: Date
-    @Binding var milestones: [String]
+    @Binding var priority: Int
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             switch step {
             case 0:
                 ExercisePrompt(
-                    title: "Name Your Goal",
-                    description: "What do you want to achieve?",
-                    example: "Example: Run a Marathon"
+                    title: "Ziel definieren",
+                    description: "Was möchtest du erreichen?",
+                    example: "Beispiel: Eine neue Sprache lernen"
                 )
-                TextField("Goal Title", text: $title)
+                TextField("Titel des Ziels", text: $title)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                 
             case 1:
                 ExercisePrompt(
-                    title: "Describe Your Goal",
-                    description: "Why is this goal important to you?",
-                    example: "Example: To improve my health and prove to myself..."
+                    title: "Ziel beschreiben",
+                    description: "Beschreibe dein Ziel genauer. Was macht es bedeutsam für dich?",
+                    example: "Beispiel: Ich möchte Spanisch lernen, um..."
                 )
                 TextEditor(text: $description)
-                    .frame(height: 100)
-                    .padding(8)
+                    .frame(height: 150)
+                    .padding(4)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
                 
             case 2:
                 ExercisePrompt(
-                    title: "Choose Category",
-                    description: "What area of life does this goal belong to?",
+                    title: "Kategorie",
+                    description: "In welchen Lebensbereich fällt dieses Ziel?",
                     example: ""
                 )
-                Picker("Category", selection: $category) {
+                Picker("Kategorie", selection: $category) {
                     ForEach(Goal.Category.allCases, id: \.self) { category in
-                        Text(category.rawValue.capitalized)
+                        Text(category.localizedName)
+                            .tag(category)
                     }
                 }
-                .pickerStyle(SegmentedPickerStyle())
                 
             case 3:
                 ExercisePrompt(
-                    title: "Set Target Date",
-                    description: "When do you want to achieve this goal?",
+                    title: "Zieldatum",
+                    description: "Bis wann möchtest du dieses Ziel erreichen?",
                     example: ""
                 )
-                DatePicker("Target Date", selection: $date, displayedComponents: .date)
+                DatePicker("Zieldatum", selection: $date, displayedComponents: .date)
                 
             case 4:
                 ExercisePrompt(
-                    title: "Define Milestones",
-                    description: "What are the key steps to achieve this goal?",
-                    example: "Example: Sign up for training program"
+                    title: "Priorität",
+                    description: "Wie wichtig ist dir dieses Ziel?",
+                    example: ""
                 )
-                DynamicList(items: $milestones)
+                Picker("Priorität", selection: $priority) {
+                    ForEach(1...5, id: \.self) { rating in
+                        HStack {
+                            Text("\(rating)")
+                            ForEach(0..<rating, id: \.self) { _ in
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.yellow)
+                            }
+                        }
+                        .tag(rating)
+                    }
+                }
                 
             default:
                 EmptyView()
@@ -329,66 +362,83 @@ struct LifestyleExercise: View {
     let step: Int
     @Binding var dailyRoutine: String
     @Binding var livingEnvironment: String
-    @Binding var workStyle: String
-    @Binding var leisureActivities: [String]
+    @Binding var workLife: String
     @Binding var relationships: String
+    @Binding var hobbies: String
+    @Binding var health: String
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             switch step {
             case 0:
                 ExercisePrompt(
-                    title: "Daily Routine",
-                    description: "Describe your ideal daily routine",
-                    example: "Example: Wake up early, meditate..."
+                    title: "Tagesablauf",
+                    description: "Wie sieht dein idealer Tagesablauf aus?",
+                    example: "Beispiel: Mein Tag beginnt mit..."
                 )
                 TextEditor(text: $dailyRoutine)
-                    .frame(height: 100)
-                    .padding(8)
+                    .frame(height: 150)
+                    .padding(4)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
                 
             case 1:
                 ExercisePrompt(
-                    title: "Living Environment",
-                    description: "Describe your ideal living space and location",
-                    example: "Example: Modern apartment with ocean view..."
+                    title: "Wohnumgebung",
+                    description: "Wie und wo möchtest du leben?",
+                    example: "Beispiel: Ich lebe in einer ruhigen Gegend..."
                 )
                 TextEditor(text: $livingEnvironment)
-                    .frame(height: 100)
-                    .padding(8)
+                    .frame(height: 150)
+                    .padding(4)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
                 
             case 2:
                 ExercisePrompt(
-                    title: "Work Style",
-                    description: "How do you want to work?",
-                    example: "Example: Remote work with flexible hours..."
+                    title: "Arbeitsleben",
+                    description: "Wie sieht dein ideales Arbeitsleben aus?",
+                    example: "Beispiel: Meine Arbeit ermöglicht mir..."
                 )
-                TextEditor(text: $workStyle)
-                    .frame(height: 100)
-                    .padding(8)
+                TextEditor(text: $workLife)
+                    .frame(height: 150)
+                    .padding(4)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
                 
             case 3:
                 ExercisePrompt(
-                    title: "Leisure Activities",
-                    description: "What activities bring you joy?",
-                    example: "Example: Hiking, Photography"
+                    title: "Beziehungen",
+                    description: "Wie gestaltest du deine Beziehungen zu anderen?",
+                    example: "Beispiel: Meine Beziehungen sind geprägt von..."
                 )
-                DynamicList(items: $leisureActivities)
+                TextEditor(text: $relationships)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
                 
             case 4:
                 ExercisePrompt(
-                    title: "Relationships",
-                    description: "Describe your ideal relationships",
-                    example: "Example: Deep friendships with like-minded people..."
+                    title: "Hobbys & Freizeit",
+                    description: "Wie verbringst du deine Freizeit?",
+                    example: "Beispiel: In meiner Freizeit widme ich mich..."
                 )
-                TextEditor(text: $relationships)
-                    .frame(height: 100)
-                    .padding(8)
+                TextEditor(text: $hobbies)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                
+            case 5:
+                ExercisePrompt(
+                    title: "Gesundheit & Wohlbefinden",
+                    description: "Wie sorgst du für deine Gesundheit und dein Wohlbefinden?",
+                    example: "Beispiel: Ich achte auf meine Gesundheit indem..."
+                )
+                TextEditor(text: $health)
+                    .frame(height: 150)
+                    .padding(4)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
                 
@@ -401,45 +451,87 @@ struct LifestyleExercise: View {
 
 struct PersonalityExercise: View {
     let step: Int
-    @Binding var corePrinciples: [String]
-    @Binding var strengths: [String]
-    @Binding var areasOfGrowth: [String]
-    @Binding var habits: [String]
+    @Binding var traits: String
+    @Binding var mindset: String
+    @Binding var behaviors: String
+    @Binding var skills: String
+    @Binding var habits: String
+    @Binding var growth: String
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             switch step {
             case 0:
                 ExercisePrompt(
-                    title: "Core Principles",
-                    description: "What principles do you want to live by?",
-                    example: "Example: Always be honest"
+                    title: "Charaktereigenschaften",
+                    description: "Welche Eigenschaften möchtest du verkörpern?",
+                    example: "Beispiel: Ich bin eine Person, die..."
                 )
-                DynamicList(items: $corePrinciples)
+                TextEditor(text: $traits)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
                 
             case 1:
                 ExercisePrompt(
-                    title: "Strengths",
-                    description: "What strengths do you want to develop?",
-                    example: "Example: Leadership"
+                    title: "Denkweise & Einstellung",
+                    description: "Wie möchtest du die Welt und dich selbst sehen?",
+                    example: "Beispiel: Ich sehe Herausforderungen als..."
                 )
-                DynamicList(items: $strengths)
+                TextEditor(text: $mindset)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
                 
             case 2:
                 ExercisePrompt(
-                    title: "Areas of Growth",
-                    description: "What areas would you like to improve?",
-                    example: "Example: Public speaking"
+                    title: "Verhaltensweisen",
+                    description: "Wie möchtest du in verschiedenen Situationen handeln?",
+                    example: "Beispiel: In schwierigen Situationen..."
                 )
-                DynamicList(items: $areasOfGrowth)
+                TextEditor(text: $behaviors)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
                 
             case 3:
                 ExercisePrompt(
-                    title: "Habits",
-                    description: "What habits will support your growth?",
-                    example: "Example: Daily meditation"
+                    title: "Fähigkeiten & Kompetenzen",
+                    description: "Welche Fähigkeiten möchtest du entwickeln?",
+                    example: "Beispiel: Ich möchte mich verbessern in..."
                 )
-                DynamicList(items: $habits)
+                TextEditor(text: $skills)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                
+            case 4:
+                ExercisePrompt(
+                    title: "Gewohnheiten",
+                    description: "Welche Gewohnheiten möchtest du entwickeln?",
+                    example: "Beispiel: Jeden Tag nehme ich mir Zeit für..."
+                )
+                TextEditor(text: $habits)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                
+            case 5:
+                ExercisePrompt(
+                    title: "Persönliche Entwicklung",
+                    description: "Wie möchtest du dich weiterentwickeln?",
+                    example: "Beispiel: In den nächsten Jahren möchte ich..."
+                )
+                TextEditor(text: $growth)
+                    .frame(height: 150)
+                    .padding(4)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
                 
             default:
                 EmptyView()
@@ -459,10 +551,9 @@ struct ExercisePrompt: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline)
-            
             Text(description)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
-            
             if !example.isEmpty {
                 Text(example)
                     .font(.caption)

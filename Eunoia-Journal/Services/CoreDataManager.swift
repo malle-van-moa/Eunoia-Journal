@@ -127,57 +127,77 @@ class CoreDataManager {
     // MARK: - Vision Board Operations
     
     func saveVisionBoard(_ visionBoard: VisionBoard) {
-        let entity = VisionBoardEntity(context: context)
-        entity.id = visionBoard.id
-        entity.userId = visionBoard.userId
-        entity.lastModified = visionBoard.lastModified
-        entity.syncStatus = visionBoard.syncStatus.rawValue
+        let request = NSFetchRequest<VisionBoardEntity>(entityName: "VisionBoardEntity")
+        request.predicate = NSPredicate(format: "id == %@", visionBoard.id ?? "")
         
-        // Save lifestyle vision
-        entity.lifestyleDailyRoutine = visionBoard.lifestyleVision.dailyRoutine
-        entity.lifestyleLivingEnvironment = visionBoard.lifestyleVision.livingEnvironment
-        entity.lifestyleWorkStyle = visionBoard.lifestyleVision.workStyle
-        entity.lifestyleLeisureActivities = visionBoard.lifestyleVision.leisureActivities.joined(separator: ",")
-        entity.lifestyleRelationships = visionBoard.lifestyleVision.relationships
-        
-        // Save desired personality
-        entity.personalityCorePrinciples = visionBoard.desiredPersonality.corePrinciples.joined(separator: ",")
-        entity.personalityStrengths = visionBoard.desiredPersonality.strengths.joined(separator: ",")
-        entity.personalityAreasOfGrowth = visionBoard.desiredPersonality.areasOfGrowth.joined(separator: ",")
-        entity.personalityHabits = visionBoard.desiredPersonality.habits.joined(separator: ",")
-        
-        // Save personal values
-        visionBoard.personalValues.forEach { value in
-            let valueEntity = PersonalValueEntity(context: context)
-            valueEntity.id = value.id
-            valueEntity.name = value.name
-            valueEntity.valueDescription = value.description
-            valueEntity.importance = Int16(value.importance)
-            valueEntity.visionBoard = entity
-        }
-        
-        // Save goals
-        visionBoard.goals.forEach { goal in
-            let goalEntity = GoalEntity(context: context)
-            goalEntity.id = goal.id
-            goalEntity.title = goal.title
-            goalEntity.goalDescription = goal.description
-            goalEntity.category = goal.category.rawValue
-            goalEntity.targetDate = goal.targetDate
-            goalEntity.visionBoard = entity
+        do {
+            let results = try context.fetch(request)
+            let entity: VisionBoardEntity
             
-            // Save milestones
-            goal.milestones.forEach { milestone in
-                let milestoneEntity = MilestoneEntity(context: context)
-                milestoneEntity.id = milestone.id
-                milestoneEntity.milestoneDescription = milestone.description
-                milestoneEntity.isCompleted = milestone.isCompleted
-                milestoneEntity.targetDate = milestone.targetDate
-                milestoneEntity.goal = goalEntity
+            if let existingEntity = results.first {
+                // Update existing entity
+                entity = existingEntity
+                
+                // Remove existing relationships
+                if let existingValues = entity.personalValues as? Set<PersonalValueEntity> {
+                    existingValues.forEach { context.delete($0) }
+                }
+                if let existingGoals = entity.goals as? Set<GoalEntity> {
+                    existingGoals.forEach { context.delete($0) }
+                }
+            } else {
+                // Create new entity
+                entity = VisionBoardEntity(context: context)
+                entity.id = visionBoard.id
             }
+            
+            // Update properties
+            entity.userId = visionBoard.userId
+            entity.lastModified = visionBoard.lastModified
+            entity.syncStatus = visionBoard.syncStatus.rawValue
+            
+            // Save lifestyle vision
+            entity.lifestyleDailyRoutine = visionBoard.lifestyleVision.dailyRoutine
+            entity.lifestyleLivingEnvironment = visionBoard.lifestyleVision.livingEnvironment
+            entity.lifestyleWorkLife = visionBoard.lifestyleVision.workLife
+            entity.lifestyleRelationships = visionBoard.lifestyleVision.relationships
+            entity.lifestyleHobbies = visionBoard.lifestyleVision.hobbies
+            entity.lifestyleHealth = visionBoard.lifestyleVision.health
+            
+            // Save desired personality
+            entity.personalityTraits = visionBoard.desiredPersonality.traits
+            entity.personalityMindset = visionBoard.desiredPersonality.mindset
+            entity.personalityBehaviors = visionBoard.desiredPersonality.behaviors
+            entity.personalitySkills = visionBoard.desiredPersonality.skills
+            entity.personalityHabits = visionBoard.desiredPersonality.habits
+            entity.personalityGrowth = visionBoard.desiredPersonality.growth
+            
+            // Save personal values
+            visionBoard.personalValues.forEach { value in
+                let valueEntity = PersonalValueEntity(context: context)
+                valueEntity.id = value.id
+                valueEntity.name = value.name
+                valueEntity.valueDescription = value.description
+                valueEntity.importance = Int16(value.importance)
+                valueEntity.visionBoard = entity
+            }
+            
+            // Save goals
+            visionBoard.goals.forEach { goal in
+                let goalEntity = GoalEntity(context: context)
+                goalEntity.id = goal.id
+                goalEntity.title = goal.title
+                goalEntity.goalDescription = goal.description
+                goalEntity.category = goal.category.rawValue
+                goalEntity.targetDate = goal.targetDate
+                goalEntity.priority = Int16(goal.priority)
+                goalEntity.visionBoard = entity
+            }
+            
+            try context.save()
+        } catch {
+            print("Error saving vision board: \(error)")
         }
-        
-        saveContext()
     }
     
     func fetchVisionBoard(for userId: String) -> VisionBoard? {
