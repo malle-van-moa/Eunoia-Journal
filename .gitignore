@@ -64,4 +64,4 @@ timeline.xctimeline
 playground.xcworkspace
 
 # Swift Package Manager
-.swiftpm/ 
+.swiftpm/ xcuserdata/
