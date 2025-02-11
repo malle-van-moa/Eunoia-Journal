@@ -11,10 +11,35 @@ struct MainTabView: View {
         TabView(selection: $selectedTab) {
             // Journal/Dashboard Tab
             NavigationStack {
-                if showingDashboard {
-                    DashboardView(selectedTab: $selectedTab, showingDashboard: $showingDashboard)
-                } else {
-                    JournalListView(viewModel: journalViewModel)
+                Group {
+                    if showingDashboard {
+                        DashboardView(selectedTab: $selectedTab, showingDashboard: $showingDashboard)
+                    } else {
+                        JournalListView(viewModel: journalViewModel)
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .principal) {
+                                    Button {
+                                        withAnimation {
+                                            showingDashboard = true
+                                        }
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "house.fill")
+                                                .imageScale(.large)
+                                                .foregroundStyle(.purple)
+                                            Text("Eunoia")
+                                                .font(.headline)
+                                                .fontWeight(.bold)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color(.systemBackground))
+                                        .cornerRadius(8)
+                                    }
+                                }
+                            }
+                    }
                 }
             }
             .tabItem {
@@ -25,7 +50,36 @@ struct MainTabView: View {
             
             // Vision Board Tab
             NavigationStack {
-                VisionBoardView(viewModel: visionBoardViewModel)
+                Group {
+                    if showingDashboard {
+                        DashboardView(selectedTab: $selectedTab, showingDashboard: $showingDashboard)
+                    } else {
+                        VisionBoardView(viewModel: visionBoardViewModel)
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .principal) {
+                                    Button {
+                                        withAnimation {
+                                            showingDashboard = true
+                                        }
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "house.fill")
+                                                .imageScale(.large)
+                                                .foregroundStyle(.purple)
+                                            Text("Eunoia")
+                                                .font(.headline)
+                                                .fontWeight(.bold)
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color(.systemBackground))
+                                        .cornerRadius(8)
+                                    }
+                                }
+                            }
+                    }
+                }
             }
             .tabItem {
                 Image(systemName: "star.fill")
@@ -36,12 +90,41 @@ struct MainTabView: View {
             // Profile Tab
             NavigationStack {
                 ProfileView(authViewModel: authViewModel)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .principal) {
+                            Button {
+                                withAnimation {
+                                    selectedTab = 1
+                                    showingDashboard = true
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "house.fill")
+                                        .imageScale(.large)
+                                        .foregroundStyle(.purple)
+                                    Text("Eunoia")
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color(.systemBackground))
+                                .cornerRadius(8)
+                            }
+                        }
+                    }
             }
             .tabItem {
                 Image(systemName: "person.fill")
                 Text("Profile")
             }
             .tag(3)
+        }
+        .onChange(of: selectedTab) { newTab in
+            if showingDashboard {
+                showingDashboard = false
+            }
         }
         .onAppear {
             journalViewModel.loadJournalEntries()
