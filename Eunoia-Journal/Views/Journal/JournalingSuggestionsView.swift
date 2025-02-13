@@ -6,13 +6,25 @@ struct JournalingSuggestionsView: View {
     @StateObject private var viewModel = JournalViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var showingSettingsInfo = false
+    @State private var suggestions: [JournalingSuggestion] = []
+    @State private var isLoading = true
     
     var body: some View {
-        VStack {
-            JournalingSuggestionsPicker("Vorschläge durchsuchen") { suggestion in
-                await createEntry(from: suggestion)
+        Group {
+            if isLoading {
+                ProgressView("Lade Vorschläge...")
+            } else {
+                VStack {
+                    JournalingSuggestionsPicker(
+                        "Vorschläge durchsuchen",
+                        selection: .constant(nil),
+                        suggesting: .activities
+                    ) { suggestion in
+                        await createEntry(from: suggestion)
+                    }
+                    .navigationTitle("Journaling Vorschläge")
+                }
             }
-            .navigationTitle("Journaling Vorschläge")
         }
         .alert("Keine Vorschläge?", isPresented: $showingSettingsInfo) {
             Button("Abbrechen", role: .cancel) {}
@@ -22,7 +34,7 @@ struct JournalingSuggestionsView: View {
                 }
             }
         } message: {
-            Text("Stelle sicher, dass du in den Einstellungen unter 'Datenschutz & Sicherheit' > 'Journaling Vorschläge' den Zugriff für Eunoia erlaubt hast.")
+            Text("Stelle sicher, dass:\n\n1. Du in den Einstellungen unter 'Datenschutz & Sicherheit' > 'Journaling Vorschläge' den Zugriff für Eunoia erlaubt hast.\n\n2. Du iOS 17.2 oder höher verwendest.\n\n3. Dein Gerät Aktivitäten aufzeichnet, die als Vorschläge dienen können.")
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -30,6 +42,11 @@ struct JournalingSuggestionsView: View {
                     Image(systemName: "info.circle")
                 }
             }
+        }
+        .task {
+            // Verzögerung für bessere UX
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            isLoading = false
         }
     }
     
