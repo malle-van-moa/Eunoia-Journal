@@ -6,7 +6,6 @@ struct JournalingSuggestionsView: View {
     @StateObject private var viewModel = JournalViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var showingSettingsInfo = false
-    @State private var suggestions: [JournalingSuggestion] = []
     @State private var isLoading = true
     
     var body: some View {
@@ -15,11 +14,7 @@ struct JournalingSuggestionsView: View {
                 ProgressView("Lade Vorschläge...")
             } else {
                 VStack {
-                    JournalingSuggestionsPicker(
-                        "Vorschläge durchsuchen",
-                        selection: .constant(nil),
-                        suggesting: .activities
-                    ) { suggestion in
+                    JournalingSuggestionsPicker<JournalingSuggestion>("Vorschläge durchsuchen") { suggestion in
                         await createEntry(from: suggestion)
                     }
                     .navigationTitle("Journaling Vorschläge")
