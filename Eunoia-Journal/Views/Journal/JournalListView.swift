@@ -1,4 +1,5 @@
 import SwiftUI
+import JournalingSuggestions
 
 struct JournalListView: View {
     @ObservedObject var viewModel: JournalViewModel
@@ -7,6 +8,7 @@ struct JournalListView: View {
     @State private var selectedEntry: JournalEntry?
     @State private var showingDatePicker = false
     @State private var selectedDate = Date()
+    @State private var showingSuggestionsPicker = false
     
     private var filteredEntries: [JournalEntry] {
         if searchText.isEmpty {
@@ -17,64 +19,89 @@ struct JournalListView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Background
-            Color(.systemGroupedBackground)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Streak Banner
-                StreakBannerView(streak: viewModel.calculateCurrentStreak())
+        NavigationView {
+            ZStack {
+                // Background
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
                 
-                // Search and Filter
-                SearchBar(text: $searchText)
-                    .padding()
-                
-                // Journal Entries List
-                if filteredEntries.isEmpty {
-                    EmptyStateView()
-                } else {
-                    List {
-                        ForEach(filteredEntries) { entry in
-                            JournalEntryRow(entry: entry)
-                                .onTapGesture {
-                                    selectedEntry = entry
-                                }
+                VStack(spacing: 0) {
+                    // Streak Banner
+                    StreakBannerView(streak: viewModel.calculateCurrentStreak())
+                    
+                    // Search and Filter
+                    SearchBar(text: $searchText)
+                        .padding()
+                    
+                    // Journal Entries List
+                    if filteredEntries.isEmpty {
+                        EmptyStateView()
+                    } else {
+                        List {
+                            ForEach(filteredEntries) { entry in
+                                JournalEntryRow(entry: entry)
+                                    .onTapGesture {
+                                        selectedEntry = entry
+                                    }
+                            }
                         }
+                        .listStyle(InsetGroupedListStyle())
                     }
-                    .listStyle(InsetGroupedListStyle())
                 }
             }
-        }
-        .navigationTitle(LocalizedStringKey("Journal"))
-        .navigationBarItems(
-            leading: Button(action: {
-                showingDatePicker.toggle()
-            }) {
-                Image(systemName: "calendar")
-            },
-            trailing: Button(action: {
-                showingNewEntry.toggle()
-            }) {
-                Image(systemName: "square.and.pencil")
+            .navigationTitle("Journal")
+            .navigationBarItems(
+                leading: Button(action: {
+                    showingDatePicker.toggle()
+                }) {
+                    Image(systemName: "calendar")
+                },
+                trailing: Button(action: {
+                    showingNewEntry.toggle()
+                }) {
+                    Image(systemName: "square.and.pencil")
+                }
+            )
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack {
+                        if #available(iOS 17.2, *) {
+                            Button {
+                                showingSuggestionsPicker = true
+                            } label: {
+                                Image(systemName: "lightbulb.fill")
+                            }
+                        }
+                    }
+                }
             }
-        )
-        .sheet(isPresented: $showingNewEntry) {
-            NavigationView {
-                JournalEntryView(viewModel: viewModel)
+            .sheet(isPresented: $showingNewEntry) {
+                NavigationView {
+                    JournalEntryView(viewModel: viewModel)
+                }
             }
-        }
-        .sheet(item: $selectedEntry) { entry in
-            NavigationView {
-                JournalEntryView(viewModel: viewModel, entry: entry)
+            .sheet(item: $selectedEntry) { entry in
+                NavigationView {
+                    JournalEntryView(viewModel: viewModel, entry: entry)
+                }
             }
-        }
-        .sheet(isPresented: $showingDatePicker) {
-            DatePickerView(selectedDate: $selectedDate) { date in
-                // Filter entries by selected date
-                let entries = viewModel.entriesByDate(date: date)
-                if let firstEntry = entries.first {
-                    selectedEntry = firstEntry
+            .sheet(isPresented: $showingDatePicker) {
+                DatePickerView(selectedDate: $selectedDate) { date in
+                    let entries = viewModel.entriesByDate(date: date)
+                    if let firstEntry = entries.first {
+                        selectedEntry = firstEntry
+                    }
+                }
+            }
+            .sheet(isPresented: $showingSuggestionsPicker) {
+                if #available(iOS 17.2, *) {
+                    JournalingSuggestionsPicker("") { suggestion in
+                        Task {
+                            await viewModel.createEntryFromSuggestion(suggestion)
+                            showingSuggestionsPicker = false
+                        }
+                    }
+                    .presentationDetents([.medium])
                 }
             }
         }
