@@ -15,6 +15,8 @@ struct JournalEntryView: View {
     @State private var selectedImages: [UIImage] = []
     @State private var showingImageViewer = false
     @State private var selectedImageIndex: Int?
+    @State private var identifiableError: IdentifiableError?
+    @State private var showingProcessingIndicator = false
     
     private let entry: JournalEntry?
     private let isEditing: Bool
@@ -36,6 +38,18 @@ struct JournalEntryView: View {
         _learning = State(initialValue: entry?.learning ?? "")
     }
     
+    private func setupInitialState() {
+        if let entry = entry {
+            Task { @MainActor in
+                viewModel.currentEntry = entry
+            }
+        } else {
+            Task { @MainActor in
+                viewModel.createNewEntry()
+            }
+        }
+    }
+    
     private func loadImages() -> [UIImage]? {
         guard let localPaths = entry?.localImagePaths else { return nil }
         let images = localPaths.compactMap { path -> UIImage? in
@@ -46,8 +60,198 @@ struct JournalEntryView: View {
         return images.isEmpty ? nil : images
     }
     
+    private var gratitudeBinding: Binding<String> {
+        Binding(
+            get: { entry?.gratitude ?? "" },
+            set: { newValue in
+                if var updatedEntry = entry {
+                    updatedEntry.gratitude = newValue
+                    viewModel.saveEntry(updatedEntry)
+                }
+            }
+        )
+    }
+    
+    // Neue Funktion zur Aktualisierung der Learning-Sektion
+    private func updateLearningContent() {
+        if let currentEntry = viewModel.currentEntry {
+            learning = currentEntry.learning
+            
+            // Aktualisiere auch den Entry, falls vorhanden
+            if var updatedEntry = entry {
+                updatedEntry.learning = currentEntry.learning
+                updatedEntry.learningNugget = currentEntry.learningNugget
+                viewModel.saveEntry(updatedEntry)
+            }
+        }
+    }
+    
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { identifiableError != nil },
+            set: { if !$0 { identifiableError = nil } }
+        )
+    }
+    
+    private func handleError(_ error: Error) {
+        DispatchQueue.main.async {
+            let journalError: JournalError
+            if let nsError = error as? NSError {
+                switch nsError.code {
+                case 401:
+                    journalError = .authError
+                case -1009:
+                    journalError = .networkError("Keine Internetverbindung")
+                default:
+                    journalError = .saveError(nsError.localizedDescription)
+                }
+            } else {
+                journalError = .saveError(error.localizedDescription)
+            }
+            self.identifiableError = IdentifiableError(journalError: journalError)
+        }
+    }
+    
     var body: some View {
         Form {
+            headerSection
+            journalSections
+            learningNuggetSection
+            imagesSection
+        }
+        .navigationTitle(entry?.title ?? "Neuer Eintrag")
+        .navigationBarItems(
+            leading: cancelButton,
+            trailing: HStack {
+                deleteButton
+                saveButton
+            }
+        )
+        .sheet(isPresented: $showingAISuggestions) {
+            AISuggestionsView(
+                field: selectedField ?? .gratitude,
+                suggestions: viewModel.aiSuggestions,
+                onSelect: handleSuggestionSelection
+            )
+        }
+        .sheet(isPresented: $showingLearningNugget) {
+            LearningNuggetPickerView(viewModel: viewModel)
+        }
+        .alert("Eintrag löschen", isPresented: $showingDeleteConfirmation) {
+            deleteConfirmationButtons
+        } message: {
+            Text("Bist du sicher, dass du diesen Eintrag löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.")
+        }
+        .alert("Fehler", isPresented: errorBinding) {
+            Button("OK", role: .cancel) {
+                clearError()
+            }
+        } message: {
+            errorContent
+        }
+        .task {
+            setupInitialState()
+        }
+        .onChange(of: viewModel.currentLearningText) { newContent in
+            // Entferne die automatische Übernahme
+            // learning = newContent
+        }
+        .onChange(of: viewModel.learningNugget) { newNugget in
+            // Entferne die automatische Übernahme
+            // if let nugget = newNugget {
+            //     learning = nugget.content
+            // }
+        }
+        .onReceive(viewModel.$error) { error in
+            if let error = error {
+                handleError(error)
+            }
+        }
+    }
+    
+    private var cancelButton: some View {
+        Button("Abbrechen") {
+            dismiss()
+        }
+    }
+    
+    private var deleteButton: some View {
+        Group {
+            if isEditing {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                }
+            }
+        }
+    }
+    
+    private var saveButton: some View {
+        Button("Fertig") {
+            saveEntry()
+        }
+        .disabled(gratitude.isEmpty && highlight.isEmpty && learning.isEmpty)
+    }
+    
+    private var deleteConfirmationButtons: some View {
+        Group {
+            Button("Löschen", role: .destructive) {
+                if let entry = entry {
+                    viewModel.deleteEntry(entry)
+                    dismiss()
+                }
+            }
+            Button("Abbrechen", role: .cancel) { }
+        }
+    }
+    
+    private var learningNuggetSection: some View {
+        Group {
+            if let nugget = viewModel.learningNugget ?? entry?.learningNugget {
+                LearningNuggetView(nugget: nugget)
+            } else {
+                learningNuggetButton
+            }
+        }
+    }
+    
+    private var learningNuggetButton: some View {
+        Button(action: { showingLearningNugget = true }) {
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                Text("Tägliche Lernerkenntnis erhalten")
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.gray)
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(10)
+        }
+    }
+    
+    private func handleSuggestionSelection(_ suggestion: String) {
+        switch selectedField {
+        case .gratitude:
+            gratitude = suggestion
+        case .highlight:
+            highlight = suggestion
+        case .learning:
+            learning = suggestion
+        case .none:
+            break
+        }
+    }
+    
+    private func clearError() {
+        identifiableError = nil
+        viewModel.error = nil
+    }
+    
+    private var headerSection: some View {
+        Group {
             if let title = entry?.title {
                 Section(header: Text("Titel")) {
                     Text(title)
@@ -65,23 +269,14 @@ struct JournalEntryView: View {
                     Text(location)
                 }
             }
-            
-            Section(header: Text("Dankbarkeit")) {
-                TextEditor(text: Binding(
-                    get: { entry?.gratitude ?? "" },
-                    set: { newValue in
-                        if var updatedEntry = entry {
-                            updatedEntry.gratitude = newValue
-                            viewModel.saveEntry(updatedEntry)
-                        }
-                    }
-                ))
-                .frame(height: 100)
-            }
-            
+        }
+    }
+    
+    private var journalSections: some View {
+        Group {
             // Gratitude Section
             JournalSection(
-                title: LocalizedStringKey("Wofür bist du heute dankbar?"),
+                title: "Wofür bist du heute dankbar?",
                 text: $gratitude,
                 systemImage: "heart.fill",
                 color: .red
@@ -92,7 +287,7 @@ struct JournalEntryView: View {
             
             // Highlight Section
             JournalSection(
-                title: LocalizedStringKey("Was war dein Highlight heute?"),
+                title: "Was war dein Highlight heute?",
                 text: $highlight,
                 systemImage: "star.fill",
                 color: .yellow
@@ -103,7 +298,7 @@ struct JournalEntryView: View {
             
             // Learning Section
             JournalSection(
-                title: LocalizedStringKey("Was hast du heute gelernt?"),
+                title: "Was hast du heute gelernt?",
                 text: $learning,
                 systemImage: "book.fill",
                 color: .blue
@@ -111,136 +306,62 @@ struct JournalEntryView: View {
                 selectedField = .learning
                 showingAISuggestions = true
             }
-            
-            // Learning Nugget
-            if let nugget = entry?.learningNugget {
-                LearningNuggetView(nugget: nugget)
-            } else {
-                Button(action: {
-                    showingLearningNugget = true
-                }) {
-                    HStack {
-                        Image(systemName: "lightbulb.fill")
-                            .foregroundColor(.yellow)
-                        Text(LocalizedStringKey("Tägliche Lernerkenntnis erhalten"))
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.gray)
-                    }
-                    .padding()
-                    .background(Color(.secondarySystemBackground))
-                    .cornerRadius(10)
-                }
-            }
-            
-            // Bilder Section
-            Section(header: Text("Bilder")) {
-                VStack(alignment: .leading, spacing: 10) {
-                    if !selectedImages.isEmpty {
-                        ImageGalleryView(images: selectedImages) { index in
-                            selectedImages.remove(at: index)
-                        }
-                        .frame(height: 120)
-                    } else if let entry = entry, let urls = entry.imageURLs, !urls.isEmpty {
-                        // Zeige Cloud-Bilder
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: 10) {
-                                ForEach(urls, id: \.self) { url in
-                                    AsyncImage(url: URL(string: url)) { phase in
-                                        switch phase {
-                                        case .empty:
-                                            ProgressView()
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                                .frame(width: 100, height: 100)
-                                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                        case .failure:
-                                            Image(systemName: "photo")
-                                                .foregroundColor(.gray)
-                                        @unknown default:
-                                            EmptyView()
-                                        }
-                                    }
-                                    .frame(width: 100, height: 100)
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        .frame(height: 120)
-                    }
-                    
-                    if selectedImages.count < maxImages {
-                        ImagePickerButton(
-                            selectedImages: $selectedImages,
-                            maxImages: maxImages
-                        )
-                    }
-                }
-            }
         }
-        .navigationTitle(entry?.title ?? "Neuer Eintrag")
-        .navigationBarItems(
-            leading: Button(LocalizedStringKey("Abbrechen")) {
-                dismiss()
-            },
-            trailing: HStack {
-                if isEditing {
-                    Button(role: .destructive) {
-                        showingDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
+    }
+    
+    private var imagesSection: some View {
+        Section(header: Text("Bilder")) {
+            VStack(alignment: .leading, spacing: 10) {
+                if !selectedImages.isEmpty {
+                    ImageGalleryView(images: selectedImages) { index in
+                        selectedImages.remove(at: index)
                     }
+                    .frame(height: 120)
+                } else if let entry = entry, let urls = entry.imageURLs, !urls.isEmpty {
+                    // Zeige Cloud-Bilder
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 10) {
+                            ForEach(urls, id: \.self) { url in
+                                AsyncImage(url: URL(string: url)) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        ProgressView()
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 100, height: 100)
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    case .failure:
+                                        Image(systemName: "photo")
+                                            .foregroundColor(.gray)
+                                    @unknown default:
+                                        EmptyView()
+                                    }
+                                }
+                                .frame(width: 100, height: 100)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .frame(height: 120)
                 }
                 
-                Button("Fertig") {
-                    saveEntry()
-                }
-                .disabled(gratitude.isEmpty && highlight.isEmpty && learning.isEmpty)
-            }
-        )
-        .sheet(isPresented: $showingAISuggestions) {
-            AISuggestionsView(
-                field: selectedField ?? .gratitude,
-                suggestions: viewModel.aiSuggestions
-            ) { suggestion in
-                switch selectedField {
-                case .gratitude:
-                    gratitude = suggestion
-                case .highlight:
-                    highlight = suggestion
-                case .learning:
-                    learning = suggestion
-                case .none:
-                    break
+                if selectedImages.count < maxImages {
+                    ImagePickerButton(
+                        selectedImages: $selectedImages,
+                        maxImages: maxImages
+                    )
                 }
             }
         }
-        .sheet(isPresented: $showingLearningNugget) {
-            LearningNuggetPickerView(viewModel: viewModel)
-        }
-        .alert(LocalizedStringKey("Eintrag löschen"), isPresented: $showingDeleteConfirmation) {
-            Button(LocalizedStringKey("Löschen"), role: .destructive) {
-                if let entry = entry {
-                    viewModel.deleteEntry(entry)
-                    dismiss()
-                }
-            }
-            Button(LocalizedStringKey("Abbrechen"), role: .cancel) {}
-        } message: {
-            Text(LocalizedStringKey("Bist du sicher, dass du diesen Eintrag löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden."))
-        }
-        .alert("Fehler", isPresented: Binding(
-            get: { viewModel.error != nil },
-            set: { if !$0 { viewModel.error = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(viewModel.errorMessage)
-        }
-        .onAppear {
-            selectedImages = loadImages() ?? []
+    }
+    
+    private var errorContent: some View {
+        if let error = identifiableError {
+            Text(error.journalError.errorDescription ?? "Unbekannter Fehler")
+        } else {
+            Text("")
         }
     }
     
@@ -261,14 +382,14 @@ struct JournalEntryView: View {
             gratitude: gratitude,
             highlight: highlight,
             learning: learning,
-            learningNugget: entry?.learningNugget,
+            learningNugget: viewModel.learningNugget ?? entry?.learningNugget,
             lastModified: Date(),
             syncStatus: .pendingUpload,
             title: entry?.title,
             content: entry?.content,
             location: entry?.location,
-            imageURLs: nil,  // Setze URLs auf nil, da sie neu generiert werden
-            localImagePaths: nil  // Setze Pfade auf nil, da sie neu generiert werden
+            imageURLs: nil,
+            localImagePaths: nil
         )
         
         Task {
@@ -300,7 +421,7 @@ struct JournalEntryView: View {
             } catch {
                 print("Fehler beim Speichern des Eintrags: \(error)")
                 await MainActor.run {
-                    viewModel.error = error
+                    handleError(error)
                 }
             }
         }
@@ -308,6 +429,31 @@ struct JournalEntryView: View {
 }
 
 // MARK: - Supporting Views
+
+enum JournalError: LocalizedError {
+    case authError
+    case saveError(String)
+    case loadError(String)
+    case networkError(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .authError:
+            return "Bitte melde dich an, um Einträge zu speichern."
+        case .saveError(let message):
+            return "Fehler beim Speichern: \(message)"
+        case .loadError(let message):
+            return "Fehler beim Laden: \(message)"
+        case .networkError(let message):
+            return "Netzwerkfehler: \(message)"
+        }
+    }
+}
+
+struct IdentifiableError: Identifiable {
+    let id = UUID()
+    let journalError: JournalError
+}
 
 struct JournalSection: View {
     let title: LocalizedStringKey
@@ -347,11 +493,11 @@ struct LearningNuggetView: View {
     let nugget: LearningNugget
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "lightbulb.fill")
                     .foregroundColor(.yellow)
-                Text("Daily Learning Nugget")
+                Text(nugget.title)
                     .font(.headline)
                 Spacer()
                 Text(nugget.category.rawValue.capitalized)
@@ -363,11 +509,25 @@ struct LearningNuggetView: View {
             }
             
             Text(nugget.content)
-                .padding()
+                .font(.body)
+                .lineSpacing(4)
+                .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground))
-                .cornerRadius(10)
+            
+            if nugget.isAddedToJournal {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Zum Journal hinzugefügt")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
         }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 
@@ -401,28 +561,124 @@ struct AISuggestionsView: View {
 struct LearningNuggetPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: JournalViewModel
+    @State private var identifiableError: IdentifiableError?
+    @State private var showingProcessingIndicator = false
     
     var body: some View {
         NavigationView {
-            List(LearningNugget.Category.allCases, id: \.self) { category in
-                Button(action: {
-                    viewModel.generateLearningNugget(for: category)
-                    viewModel.addLearningNuggetToEntry()
-                    dismiss()
-                }) {
-                    HStack {
-                        Text(category.rawValue.capitalized)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(.gray)
+            ZStack {
+                categoryList
+                loadingOverlay
+            }
+            .navigationTitle("Wähle eine Kategorie")
+            .navigationBarItems(trailing: cancelButton)
+            .onReceive(viewModel.$learningNugget) { nugget in
+                handleNuggetChange(nugget)
+            }
+            .onReceive(viewModel.$error) { error in
+                showingProcessingIndicator = false
+                if let error = error {
+                    handleError(error)
+                }
+            }
+            .alert("Fehler", isPresented: errorBinding) {
+                Button("OK", role: .cancel) {
+                    clearError()
+                }
+            } message: {
+                Text(identifiableError?.journalError.errorDescription ?? "")
+            }
+        }
+    }
+    
+    private var categoryList: some View {
+        List(LearningNugget.Category.allCases, id: \.self) { category in
+            categoryButton(for: category)
+        }
+    }
+    
+    private func categoryButton(for category: LearningNugget.Category) -> some View {
+        Button(action: { selectCategory(category) }) {
+            HStack {
+                Text(category.rawValue.capitalized)
+                Spacer()
+                if viewModel.isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                } else {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .disabled(viewModel.isLoading)
+    }
+    
+    private var loadingOverlay: some View {
+        Group {
+            if viewModel.isLoading || showingProcessingIndicator {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .edgesIgnoringSafeArea(.all)
+                    VStack {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        Text(showingProcessingIndicator ? "Verarbeite Antwort..." : "Generiere Lernerkenntnis...")
+                            .foregroundColor(.white)
+                            .padding(.top)
                     }
                 }
             }
-            .navigationTitle("Choose Category")
-            .navigationBarItems(trailing: Button("Cancel") {
-                dismiss()
-            })
         }
+    }
+    
+    private var cancelButton: some View {
+        Button("Abbrechen") {
+            dismiss()
+        }
+    }
+    
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { identifiableError != nil },
+            set: { if !$0 { clearError() } }
+        )
+    }
+    
+    private func selectCategory(_ category: LearningNugget.Category) {
+        showingProcessingIndicator = true
+        viewModel.generateLearningNugget(for: category)
+    }
+    
+    private func handleNuggetChange(_ nugget: LearningNugget?) {
+        showingProcessingIndicator = false
+        if nugget != nil {
+            dismiss()
+        }
+    }
+    
+    private func handleError(_ error: Error) {
+        DispatchQueue.main.async {
+            let journalError: JournalError
+            if let nsError = error as? NSError {
+                switch nsError.code {
+                case 401:
+                    journalError = .authError
+                case -1009:
+                    journalError = .networkError("Keine Internetverbindung")
+                default:
+                    journalError = .saveError(nsError.localizedDescription)
+                }
+            } else {
+                journalError = .saveError(error.localizedDescription)
+            }
+            self.identifiableError = IdentifiableError(journalError: journalError)
+        }
+    }
+    
+    private func clearError() {
+        identifiableError = nil
+        viewModel.error = nil
     }
 }
 
