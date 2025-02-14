@@ -1,10 +1,18 @@
 import Foundation
 import FirebaseCore
 import FirebaseFirestore
+import FirebaseAuth
 import Combine
+import JournalingSuggestions
+import OSLog
+import FirebaseStorage
+import UIKit
+import PhotosUI
 
+@available(iOS 17.0, *)
 class JournalService {
     static let shared = JournalService()
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Eunoia", category: "JournalService")
     
     private let db = Firestore.firestore()
     private let coreDataManager = CoreDataManager.shared
@@ -18,7 +26,6 @@ class JournalService {
             throw FirebaseError.invalidData("Entry ID is missing")
         }
         
-        // Create the dictionary manually to avoid JSON encoding issues with Timestamps
         var dict: [String: Any] = [
             "userId": entry.userId,
             "date": Timestamp(date: entry.date),
@@ -30,6 +37,15 @@ class JournalService {
         ]
         
         // Add optional fields
+        if let title = entry.title {
+            dict["title"] = title
+        }
+        if let content = entry.content {
+            dict["content"] = content
+        }
+        if let location = entry.location {
+            dict["location"] = location
+        }
         if let learningNugget = entry.learningNugget {
             let nuggetDict: [String: Any] = [
                 "category": learningNugget.category.rawValue,
@@ -245,6 +261,87 @@ class JournalService {
         }
         
         return subject.eraseToAnyPublisher()
+    }
+    
+    @available(iOS 17.2, *)
+    func createEntryFromSuggestion(_ suggestion: JournalingSuggestion) async throws -> JournalEntry {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            throw FirebaseError.invalidData("User ID ist nicht verfügbar")
+        }
+        
+        // Versuche den aktuellen Standort zu erhalten
+        var locationString: String? = nil
+        do {
+            locationString = try await LocationManager.shared.getCurrentLocationString()
+        } catch {
+            logger.error("Fehler beim Abrufen des Standorts: \(error.localizedDescription)")
+        }
+        
+        // Erstelle einen neuen Eintrag mit den verfügbaren Informationen
+        let entry = JournalEntry(
+            id: UUID().uuidString,
+            userId: userId,
+            date: Date(),
+            gratitude: "",
+            highlight: suggestion.title,
+            learning: "",
+            title: suggestion.title,
+            content: suggestion.title,
+            location: locationString,
+            imageURLs: nil
+        )
+        
+        try await saveJournalEntry(entry)
+        return entry
+    }
+    
+    func saveJournalEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
+        var imageURLs: [String] = []
+        
+        // Konvertiere UIImages zu Data
+        let imageDataArray = images.compactMap { image in
+            image.jpegData(compressionQuality: 0.7)
+        }
+        
+        // Lade Bilder hoch
+        if !imageDataArray.isEmpty {
+            imageURLs = try await uploadImages(imageDataArray)
+        }
+        
+        // Erstelle aktualisiertes Entry mit Bild-URLs
+        var updatedEntry = entry
+        updatedEntry.imageURLs = imageURLs
+        
+        // Speichere Entry
+        try await saveJournalEntry(updatedEntry)
+        
+        return updatedEntry
+    }
+    
+    private func uploadImages(_ images: [Data]) async throws -> [String] {
+        var urls: [String] = []
+        let storage = Storage.storage()
+        let storageRef = storage.reference()
+        
+        for (index, imageData) in images.enumerated() {
+            let imagePath = "journal_images/\(UUID().uuidString)_\(index).jpg"
+            let imageRef = storageRef.child(imagePath)
+            
+            _ = try await imageRef.putDataAsync(imageData)
+            let downloadURL = try await imageRef.downloadURL()
+            urls.append(downloadURL.absoluteString)
+        }
+        
+        return urls
+    }
+    
+    func deleteImages(urls: [String]) async throws {
+        let storage = Storage.storage()
+        
+        for url in urls {
+            guard let storageRef = try? storage.reference(forURL: url) else { continue }
+            try await storageRef.delete()
+        }
     }
     
     // MARK: - Error Types

@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Eunoia benötigt Zugriff auf deine Fotos, um sie in deinen Journal-Einträgen zu speichern.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Eunoia benötigt Zugriff auf deinen Standort, um ihn in deinen Journal-Einträgen zu speichern.</string>
+    <key>NSLocationUsageDescription</key>
+    <string>Eunoia verwendet deinen Standort für deine Journal-Einträge.</string>
     <key>GIDClientID</key>
     <string>190076633593-ts4rmhrf0rnvv2m9h337kamn3t2ig5kc.apps.googleusercontent.com</string>
     <key>CFBundleURLTypes</key>
@@ -13,6 +19,23 @@
             </array>
             <key>CFBundleURLName</key>
             <string>Google Sign In</string>
+        </dict>
+    </array>
+    <key>NSJournalingSuggestionsUsageDescription</key>
+    <string>Eunoia möchte dir personalisierte Vorschläge für deine Journaling-Einträge machen.</string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>journaling-suggestions</string>
+    </array>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSJournalingSuggestionsAPI</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>C617.1</string>
+            </array>
         </dict>
     </array>
     <!-- Existing entries will be preserved -->

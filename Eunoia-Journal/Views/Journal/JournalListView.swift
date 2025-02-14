@@ -1,6 +1,7 @@
 import SwiftUI
 import JournalingSuggestions
 
+@available(iOS 17.0, *)
 struct JournalListView: View {
     @ObservedObject var viewModel: JournalViewModel
     @State private var searchText = ""
@@ -64,14 +65,10 @@ struct JournalListView: View {
             )
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
-                        if #available(iOS 17.2, *) {
-                            Button {
-                                showingSuggestionsPicker = true
-                            } label: {
-                                Image(systemName: "lightbulb.fill")
-                            }
-                        }
+                    Button(action: {
+                        showingSuggestionsPicker = true
+                    }) {
+                        Image(systemName: "lightbulb")
                     }
                 }
             }
@@ -94,14 +91,30 @@ struct JournalListView: View {
                 }
             }
             .sheet(isPresented: $showingSuggestionsPicker) {
-                if #available(iOS 17.2, *) {
-                    JournalingSuggestionsPicker("") { suggestion in
+                NavigationView {
+                    JournalingSuggestionsPicker(label: {
+                        Text("Vorschläge")
+                    }, onCompletion: { suggestion in
                         Task {
-                            await viewModel.createEntryFromSuggestion(suggestion)
-                            showingSuggestionsPicker = false
+                            do {
+                                try await viewModel.createEntryFromSuggestion(suggestion)
+                                await MainActor.run {
+                                    showingSuggestionsPicker = false
+                                }
+                            } catch {
+                                print("Fehler beim Erstellen des Eintrags: \(error)")
+                                // Zeige dem Benutzer einen Fehler an
+                                await MainActor.run {
+                                    // TODO: Implementiere eine Fehleranzeige
+                                    showingSuggestionsPicker = false
+                                }
+                            }
                         }
-                    }
-                    .presentationDetents([.medium])
+                    })
+                    .navigationTitle("Vorschläge")
+                    .navigationBarItems(trailing: Button("Fertig") {
+                        showingSuggestionsPicker = false
+                    })
                 }
             }
         }
@@ -143,28 +156,58 @@ struct SearchBar: View {
 struct JournalEntryRow: View {
     let entry: JournalEntry
     
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .long
+        formatter.timeStyle = .none
+        formatter.locale = Locale(identifier: "de_DE")
+        return formatter.string(from: entry.date)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(entry.date, style: .date)
-                    .font(.headline)
-                Spacer()
-                if entry.learningNugget != nil {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundColor(.yellow)
+            Text(entry.title ?? formattedDate)
+                .font(.headline)
+            
+            if let content = entry.content {
+                Text(content)
+                    .font(.subheadline)
+                    .lineLimit(2)
+            }
+            
+            if let location = entry.location {
+                HStack {
+                    Image(systemName: "location")
+                    Text(location)
+                        .font(.caption)
                 }
             }
             
-            if !entry.gratitude.isEmpty {
-                Text(LocalizedStringKey("Dankbar für: \(entry.gratitude)"))
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-            
-            if !entry.highlight.isEmpty {
-                Text(LocalizedStringKey("Highlight: \(entry.highlight)"))
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
+            if let imageURLs = entry.imageURLs, !imageURLs.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack {
+                        ForEach(imageURLs, id: \.self) { url in
+                            AsyncImage(url: URL(string: url)) { phase in
+                                switch phase {
+                                case .empty:
+                                    ProgressView()
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                case .failure:
+                                    Image(systemName: "photo")
+                                        .foregroundColor(.gray)
+                                @unknown default:
+                                    EmptyView()
+                                }
+                            }
+                            .frame(width: 60, height: 60)
+                        }
+                    }
+                }
             }
         }
         .padding(.vertical, 8)
@@ -216,8 +259,37 @@ struct DatePickerView: View {
     }
 }
 
-#Preview {
-    NavigationView {
-        JournalListView(viewModel: JournalViewModel())
+@available(iOS 17.0, *)
+extension JournalViewModel {
+    static func previewMock() -> JournalViewModel {
+        let viewModel = JournalViewModel()
+        // Füge einige Mock-Einträge hinzu
+        let mockEntry = JournalEntry(
+            id: UUID().uuidString,
+            userId: "preview-user",
+            date: Date(),
+            gratitude: "Dankbar für einen neuen Tag",
+            highlight: "Erfolgreicher Projektabschluss",
+            learning: "Neue SwiftUI Techniken gelernt",
+            learningNugget: nil,
+            lastModified: Date(),
+            syncStatus: .synced,
+            serverTimestamp: nil,
+            title: "Mein erster Eintrag",
+            content: "Dies ist ein Beispieleintrag für die Preview",
+            location: "Berlin, Deutschland",
+            imageURLs: nil
+        )
+        viewModel.journalEntries = [mockEntry]
+        return viewModel
+    }
+}
+
+@available(iOS 17.0, *)
+struct JournalListView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationView {
+            JournalListView(viewModel: JournalViewModel.previewMock())
+        }
     }
 } 

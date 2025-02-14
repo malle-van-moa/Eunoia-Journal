@@ -33,75 +33,93 @@ struct JournalEntryView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Date Header
-                HStack {
-                    Image(systemName: "calendar")
-                        .foregroundColor(.purple)
-                    Text(entry?.date ?? Date(), style: .date)
-                        .font(.headline)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                
-                // Gratitude Section
-                JournalSection(
-                    title: LocalizedStringKey("Wofür bist du heute dankbar?"),
-                    text: $gratitude,
-                    systemImage: "heart.fill",
-                    color: .red
-                ) {
-                    selectedField = .gratitude
-                    showingAISuggestions = true
-                }
-                
-                // Highlight Section
-                JournalSection(
-                    title: LocalizedStringKey("Was war dein Highlight heute?"),
-                    text: $highlight,
-                    systemImage: "star.fill",
-                    color: .yellow
-                ) {
-                    selectedField = .highlight
-                    showingAISuggestions = true
-                }
-                
-                // Learning Section
-                JournalSection(
-                    title: LocalizedStringKey("Was hast du heute gelernt?"),
-                    text: $learning,
-                    systemImage: "book.fill",
-                    color: .blue
-                ) {
-                    selectedField = .learning
-                    showingAISuggestions = true
-                }
-                
-                // Learning Nugget
-                if let nugget = entry?.learningNugget {
-                    LearningNuggetView(nugget: nugget)
-                } else {
-                    Button(action: {
-                        showingLearningNugget = true
-                    }) {
-                        HStack {
-                            Image(systemName: "lightbulb.fill")
-                                .foregroundColor(.yellow)
-                            Text(LocalizedStringKey("Tägliche Lernerkenntnis erhalten"))
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.gray)
-                        }
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(10)
-                    }
+        Form {
+            if let title = entry?.title {
+                Section(header: Text("Titel")) {
+                    Text(title)
                 }
             }
-            .padding()
+            
+            if let content = entry?.content {
+                Section(header: Text("Inhalt")) {
+                    Text(content)
+                }
+            }
+            
+            if let location = entry?.location {
+                Section(header: Text("Ort")) {
+                    Text(location)
+                }
+            }
+            
+            Section(header: Text("Dankbarkeit")) {
+                TextEditor(text: Binding(
+                    get: { entry?.gratitude ?? "" },
+                    set: { newValue in
+                        if var updatedEntry = entry {
+                            updatedEntry.gratitude = newValue
+                            viewModel.saveEntry(updatedEntry)
+                        }
+                    }
+                ))
+                .frame(height: 100)
+            }
+            
+            // Gratitude Section
+            JournalSection(
+                title: LocalizedStringKey("Wofür bist du heute dankbar?"),
+                text: $gratitude,
+                systemImage: "heart.fill",
+                color: .red
+            ) {
+                selectedField = .gratitude
+                showingAISuggestions = true
+            }
+            
+            // Highlight Section
+            JournalSection(
+                title: LocalizedStringKey("Was war dein Highlight heute?"),
+                text: $highlight,
+                systemImage: "star.fill",
+                color: .yellow
+            ) {
+                selectedField = .highlight
+                showingAISuggestions = true
+            }
+            
+            // Learning Section
+            JournalSection(
+                title: LocalizedStringKey("Was hast du heute gelernt?"),
+                text: $learning,
+                systemImage: "book.fill",
+                color: .blue
+            ) {
+                selectedField = .learning
+                showingAISuggestions = true
+            }
+            
+            // Learning Nugget
+            if let nugget = entry?.learningNugget {
+                LearningNuggetView(nugget: nugget)
+            } else {
+                Button(action: {
+                    showingLearningNugget = true
+                }) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(.yellow)
+                        Text(LocalizedStringKey("Tägliche Lernerkenntnis erhalten"))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(10)
+                }
+            }
         }
-        .navigationTitle(isEditing ? LocalizedStringKey("Eintrag bearbeiten") : LocalizedStringKey("Neuer Eintrag"))
+        .navigationTitle(entry?.title ?? "Neuer Eintrag")
         .navigationBarItems(
             leading: Button(LocalizedStringKey("Abbrechen")) {
                 dismiss()
@@ -115,8 +133,11 @@ struct JournalEntryView: View {
                     }
                 }
                 
-                Button(LocalizedStringKey("Speichern")) {
-                    saveEntry()
+                Button("Fertig") {
+                    if let entry = entry {
+                        viewModel.saveEntry(entry)
+                    }
+                    dismiss()
                 }
                 .disabled(gratitude.isEmpty && highlight.isEmpty && learning.isEmpty)
             }

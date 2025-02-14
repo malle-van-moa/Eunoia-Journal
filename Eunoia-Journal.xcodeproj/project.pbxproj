@@ -39,6 +39,7 @@
 		1FAC8AAECAF8A813DD940B2A /* Pods_Eunoia_JournalUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Eunoia_JournalUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		61F31860CA0EA812C9786026 /* Pods_Eunoia_Journal.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Eunoia_Journal.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		646692BDB24939E42F20BB6D /* Pods-Eunoia-JournalTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-JournalTests.debug.xcconfig"; path = "Target Support Files/Pods-Eunoia-JournalTests/Pods-Eunoia-JournalTests.debug.xcconfig"; sourceTree = "<group>"; };
+		674026A92D5F48E700453D85 /* Eunoia-Journal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Eunoia-Journal.entitlements"; sourceTree = "<group>"; };
 		67510D422D4AA03700A63CEC /* Eunoia-Journal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Eunoia-Journal.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67510D522D4AA03900A63CEC /* Eunoia-JournalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Eunoia-JournalTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67510D5C2D4AA03900A63CEC /* Eunoia-JournalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Eunoia-JournalUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -126,6 +127,7 @@
 		67510D392D4AA03700A63CEC = {
 			isa = PBXGroup;
 			children = (
+				674026A92D5F48E700453D85 /* Eunoia-Journal.entitlements */,
 				67510D442D4AA03700A63CEC /* Eunoia-Journal */,
 				67510D552D4AA03900A63CEC /* Eunoia-JournalTests */,
 				67510D5F2D4AA03900A63CEC /* Eunoia-JournalUITests */,
@@ -244,6 +246,11 @@
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1610;
 				LastUpgradeCheck = 1610;
+				SystemCapabilities = {
+					com.apple.JournalingSuggestions = {
+						enabled = 1;
+					};
+				};
 				TargetAttributes = {
 					67510D412D4AA03700A63CEC = {
 						CreatedOnToolsVersion = 16.1;
@@ -558,6 +565,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "Eunoia-Journal.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -575,6 +583,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Eunoia-Journal/Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -591,6 +600,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.alexandermalchow.Eunoia-Journal";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SHELL_SCRIPT_SANDBOXING = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -606,6 +616,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = "Eunoia-Journal.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -623,6 +634,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Eunoia-Journal/Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -639,6 +651,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "com.alexandermalchow.Eunoia-Journal";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SHELL_SCRIPT_SANDBOXING = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

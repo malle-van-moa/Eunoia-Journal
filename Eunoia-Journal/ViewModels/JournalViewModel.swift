@@ -1,7 +1,11 @@
 import Foundation
 import Combine
 import FirebaseAuth
+import JournalingSuggestions
+import OSLog
+import UIKit
 
+@available(iOS 17.0, *)
 class JournalViewModel: ObservableObject {
     @Published var journalEntries: [JournalEntry] = []
     @Published var isLoading = false
@@ -12,6 +16,9 @@ class JournalViewModel: ObservableObject {
     
     private let firebaseService = FirebaseService.shared
     private let coreDataManager = CoreDataManager.shared
+    private let learningNuggetService = LearningNuggetService.shared
+    private let journalService = JournalService.shared
+    private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Eunoia", category: "JournalViewModel")
     private var cancellables = Set<AnyCancellable>()
     
     init() {
@@ -234,13 +241,18 @@ class JournalViewModel: ObservableObject {
     }
     
     func generateLearningNugget(for category: LearningNugget.Category) {
-        // TODO: Implement AI learning nugget generation
-        // This would integrate with OpenAI or another AI service
-        learningNugget = LearningNugget(
-            category: category,
-            content: "Did you know? The average person spends 6 months of their lifetime waiting for red lights to turn green.",
-            isAddedToJournal: false
-        )
+        Task {
+            do {
+                let nugget = try await learningNuggetService.generateLearningNugget(for: category)
+                DispatchQueue.main.async {
+                    self.learningNugget = nugget
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.error = error
+                }
+            }
+        }
     }
     
     func addLearningNuggetToEntry() {
@@ -289,5 +301,43 @@ class JournalViewModel: ObservableObject {
     
     var errorMessage: String {
         error?.localizedDescription ?? ""
+    }
+    
+    @available(iOS 17.2, *)
+    @MainActor
+    func createEntryFromSuggestion(_ suggestion: JournalingSuggestion) async {
+        do {
+            isLoading = true
+            _ = try await journalService.createEntryFromSuggestion(suggestion)
+            loadJournalEntries() // Lade die Einträge neu nach dem Erstellen
+        } catch {
+            logger.error("Fehler beim Erstellen des Eintrags: \(error.localizedDescription)")
+            self.error = error
+        }
+        isLoading = false
+    }
+    
+    // MARK: - Image Handling
+    
+    func saveEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
+        // Wenn der Eintrag bereits Bilder hat, lösche diese zuerst
+        if let existingUrls = entry.imageURLs {
+            try await journalService.deleteImages(urls: existingUrls)
+        }
+        
+        // Speichere den Eintrag mit den neuen Bildern
+        return try await journalService.saveJournalEntryWithImages(entry, images: images)
+    }
+    
+    func deleteEntryWithImages(_ entry: JournalEntry) async throws {
+        // Lösche zuerst die Bilder, falls vorhanden
+        if let imageUrls = entry.imageURLs {
+            try await journalService.deleteImages(urls: imageUrls)
+        }
+        
+        // Dann lösche den Eintrag
+        if let id = entry.id {
+            try await journalService.deleteJournalEntry(withId: id)
+        }
     }
 } 

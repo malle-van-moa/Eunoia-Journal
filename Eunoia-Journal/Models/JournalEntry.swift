@@ -19,6 +19,10 @@ struct JournalEntry: Identifiable, Codable {
     var lastModified: Date
     var syncStatus: SyncStatus
     var serverTimestamp: Timestamp?
+    var title: String?
+    var content: String?
+    var location: String?
+    var imageURLs: [String]?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -31,6 +35,10 @@ struct JournalEntry: Identifiable, Codable {
         case lastModified
         case syncStatus
         case serverTimestamp
+        case title
+        case content
+        case location
+        case imageURLs
     }
     
     // Custom encoding to handle Timestamp
@@ -70,6 +78,11 @@ struct JournalEntry: Identifiable, Codable {
             ]
             try container.encode(serverDict, forKey: .serverTimestamp)
         }
+        
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(content, forKey: .content)
+        try container.encodeIfPresent(location, forKey: .location)
+        try container.encodeIfPresent(imageURLs, forKey: .imageURLs)
     }
     
     // Custom decoding to handle Timestamp
@@ -97,6 +110,11 @@ struct JournalEntry: Identifiable, Codable {
         } else {
             serverTimestamp = nil
         }
+        
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        content = try container.decodeIfPresent(String.self, forKey: .content)
+        location = try container.decodeIfPresent(String.self, forKey: .location)
+        imageURLs = try container.decodeIfPresent([String].self, forKey: .imageURLs)
     }
     
     // Convenience initializer
@@ -107,9 +125,13 @@ struct JournalEntry: Identifiable, Codable {
          highlight: String,
          learning: String,
          learningNugget: LearningNugget? = nil,
-         lastModified: Date,
-         syncStatus: SyncStatus,
-         serverTimestamp: Timestamp? = nil) {
+         lastModified: Date = Date(),
+         syncStatus: SyncStatus = .pendingUpload,
+         serverTimestamp: Timestamp? = nil,
+         title: String? = nil,
+         content: String? = nil,
+         location: String? = nil,
+         imageURLs: [String]? = nil) {
         self.id = id
         self.userId = userId
         self.date = date
@@ -120,6 +142,10 @@ struct JournalEntry: Identifiable, Codable {
         self.lastModified = lastModified
         self.syncStatus = syncStatus
         self.serverTimestamp = serverTimestamp
+        self.title = title
+        self.content = content
+        self.location = location
+        self.imageURLs = imageURLs
     }
 }
 
