@@ -2,36 +2,47 @@ import Foundation
 import Network
 import Combine
 
+enum NetworkError: Error {
+    case noConnection
+    
+    var localizedDescription: String {
+        switch self {
+        case .noConnection:
+            return "Keine Internetverbindung verfügbar. Bitte überprüfe deine Verbindung und versuche es erneut."
+        }
+    }
+}
+
 class NetworkMonitor: ObservableObject {
     static let shared = NetworkMonitor()
-    private let monitor = NWPathMonitor()
+    private let monitor: NWPathMonitor
     private let queue = DispatchQueue(label: "NetworkMonitor")
     
-    @Published var isConnected = false
+    @Published private(set) var isConnected = true
     private var cancellables = Set<AnyCancellable>()
     
-    private init() {
-        setupMonitoring()
+    init() {
+        monitor = NWPathMonitor()
+        setupMonitor()
     }
     
-    private func setupMonitoring() {
+    private func setupMonitor() {
         monitor.pathUpdateHandler = { [weak self] path in
             DispatchQueue.main.async {
-                let wasConnected = self?.isConnected ?? false
                 self?.isConnected = path.status == .satisfied
-                
-                // If we just got connected and were previously disconnected
-                if self?.isConnected == true && !wasConnected {
-                    // Sync pending data
-                    FirebaseService.shared.syncLocalData()
-                }
             }
         }
-        
+    }
+    
+    func startMonitoring() {
         monitor.start(queue: queue)
     }
     
-    deinit {
+    func stopMonitoring() {
         monitor.cancel()
+    }
+    
+    deinit {
+        stopMonitoring()
     }
 } 

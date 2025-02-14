@@ -14,20 +14,40 @@ class FirebaseService {
     private let journalService = JournalService.shared
     private let visionBoardService = VisionBoardService.shared
     private let coreDataManager = CoreDataManager.shared
+    private let db = Firestore.firestore()
+    private var networkMonitor: NetworkMonitor?
     
-    private init() {}
+    private init() {
+        setupNetworkMonitoring()
+    }
+    
+    private func setupNetworkMonitoring() {
+        networkMonitor = NetworkMonitor()
+        networkMonitor?.startMonitoring()
+    }
+    
+    // MARK: - Network State
+    
+    private func ensureNetworkConnection() throws {
+        guard networkMonitor?.isConnected == true else {
+            throw NetworkError.noConnection
+        }
+    }
     
     // MARK: - Authentication
     
     func signUp(email: String, password: String) async throws -> User {
-        try await authService.signUp(email: email, password: password)
+        try ensureNetworkConnection()
+        return try await authService.signUp(email: email, password: password)
     }
     
     func signIn(email: String, password: String) async throws -> User {
-        try await authService.signIn(email: email, password: password)
+        try ensureNetworkConnection()
+        return try await authService.signIn(email: email, password: password)
     }
     
     func signOut() throws {
+        try ensureNetworkConnection()
         try authService.signOut()
     }
     
@@ -46,6 +66,7 @@ class FirebaseService {
     // MARK: - Journal Entries
     
     func saveJournalEntry(_ entry: JournalEntry) async throws {
+        try ensureNetworkConnection()
         try await journalService.saveJournalEntry(entry)
     }
     

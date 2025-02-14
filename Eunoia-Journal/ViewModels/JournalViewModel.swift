@@ -1,7 +1,9 @@
+#if canImport(JournalingSuggestions)
+import JournalingSuggestions
+#endif
 import Foundation
 import Combine
 import FirebaseAuth
-import JournalingSuggestions
 import OSLog
 import UIKit
 
@@ -29,9 +31,18 @@ class JournalViewModel: ObservableObject {
     private func setupAuthSubscription() {
         // Listen for auth state changes
         Auth.auth().addStateDidChangeListener { [weak self] (_, user) in
-            if let userId = user?.uid {
-                self?.setupSubscriptions(for: userId)
-                self?.loadJournalEntries()
+            guard let self = self else { return }
+            
+            // Ensure we're on the main thread for UI updates
+            DispatchQueue.main.async {
+                if let userId = user?.uid {
+                    self.setupSubscriptions(for: userId)
+                    self.loadJournalEntries()
+                } else {
+                    // Clear subscriptions when user is not authenticated
+                    self.cancellables.removeAll()
+                    self.journalEntries = []
+                }
             }
         }
     }
@@ -40,15 +51,19 @@ class JournalViewModel: ObservableObject {
         // Cancel existing subscriptions
         cancellables.removeAll()
         
-        // Subscribe to real-time journal entry updates
+        // Subscribe to real-time journal entry updates with retry logic
         firebaseService.observeJournalEntries(for: userId)
+            .retry(3) // Retry up to 3 times on failure
             .receive(on: DispatchQueue.main)
-            .sink { completion in
+            .sink { [weak self] completion in
+                guard let self = self else { return }
                 if case .failure(let error) = completion {
+                    self.logger.error("Failed to observe journal entries: \(error.localizedDescription)")
                     self.error = error
                 }
             } receiveValue: { [weak self] entries in
-                self?.handleNewEntries(entries)
+                guard let self = self else { return }
+                self.journalEntries = entries
             }
             .store(in: &cancellables)
             
@@ -303,41 +318,79 @@ class JournalViewModel: ObservableObject {
         error?.localizedDescription ?? ""
     }
     
+    #if canImport(JournalingSuggestions)
     @available(iOS 17.2, *)
     @MainActor
-    func createEntryFromSuggestion(_ suggestion: JournalingSuggestion) async {
+    func createEntryFromSuggestion(_ suggestion: JournalingSuggestion) async throws -> JournalEntry {
+        isLoading = true
+        
         do {
-            isLoading = true
-            _ = try await journalService.createEntryFromSuggestion(suggestion)
+            let entry = try await journalService.createEntryFromSuggestion(suggestion)
             loadJournalEntries() // Lade die Einträge neu nach dem Erstellen
+            isLoading = false
+            return entry
         } catch {
             logger.error("Fehler beim Erstellen des Eintrags: \(error.localizedDescription)")
             self.error = error
+            isLoading = false
+            throw error
         }
-        isLoading = false
     }
+    #endif
     
     // MARK: - Image Handling
     
     func saveEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
         // Wenn der Eintrag bereits Bilder hat, lösche diese zuerst
         if let existingUrls = entry.imageURLs {
-            try await journalService.deleteImages(urls: existingUrls)
+            try await journalService.deleteCloudImages(urls: existingUrls)
+        }
+        
+        // Lösche auch lokale Bilder, falls vorhanden
+        if let localPaths = entry.localImagePaths {
+            for path in localPaths {
+                try? FileManager.default.removeItem(atPath: path)
+            }
         }
         
         // Speichere den Eintrag mit den neuen Bildern
-        return try await journalService.saveJournalEntryWithImages(entry, images: images)
+        let updatedEntry = try await journalService.saveJournalEntryWithImages(entry, images: images)
+        
+        // Aktualisiere den lokalen Cache
+        await MainActor.run {
+            if let index = journalEntries.firstIndex(where: { $0.id == updatedEntry.id }) {
+                journalEntries[index] = updatedEntry
+            }
+        }
+        
+        return updatedEntry
     }
     
     func deleteEntryWithImages(_ entry: JournalEntry) async throws {
         // Lösche zuerst die Bilder, falls vorhanden
         if let imageUrls = entry.imageURLs {
-            try await journalService.deleteImages(urls: imageUrls)
+            try await journalService.deleteCloudImages(urls: imageUrls)
+        }
+        
+        // Lösche lokale Bilder
+        if let localPaths = entry.localImagePaths {
+            for path in localPaths {
+                try? FileManager.default.removeItem(atPath: path)
+            }
         }
         
         // Dann lösche den Eintrag
         if let id = entry.id {
             try await journalService.deleteJournalEntry(withId: id)
+            
+            // Aktualisiere den lokalen Cache
+            await MainActor.run {
+                journalEntries.removeAll { $0.id == id }
+            }
         }
+    }
+    
+    func updateEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
+        return try await saveEntryWithImages(entry, images: images)
     }
 } 
