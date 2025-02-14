@@ -12,9 +12,13 @@ struct JournalEntryView: View {
     @State private var showingLearningNugget = false
     @State private var selectedField: JournalField?
     @State private var showingDeleteConfirmation = false
+    @State private var selectedImages: [UIImage] = []
+    @State private var showingImageViewer = false
+    @State private var selectedImageIndex: Int?
     
     private let entry: JournalEntry?
     private let isEditing: Bool
+    private let maxImages = 5
     
     enum JournalField: String {
         case gratitude = "Dankbarkeit"
@@ -30,6 +34,16 @@ struct JournalEntryView: View {
         _gratitude = State(initialValue: entry?.gratitude ?? "")
         _highlight = State(initialValue: entry?.highlight ?? "")
         _learning = State(initialValue: entry?.learning ?? "")
+    }
+    
+    private func loadImages() -> [UIImage]? {
+        guard let localPaths = entry?.localImagePaths else { return nil }
+        let images = localPaths.compactMap { path -> UIImage? in
+            guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+            let fileURL = documentsDirectory.appendingPathComponent(path)
+            return UIImage(contentsOfFile: fileURL.path)
+        }
+        return images.isEmpty ? nil : images
     }
     
     var body: some View {
@@ -118,6 +132,53 @@ struct JournalEntryView: View {
                     .cornerRadius(10)
                 }
             }
+            
+            // Bilder Section
+            Section(header: Text("Bilder")) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if !selectedImages.isEmpty {
+                        ImageGalleryView(images: selectedImages) { index in
+                            selectedImages.remove(at: index)
+                        }
+                        .frame(height: 120)
+                    } else if let entry = entry, let urls = entry.imageURLs, !urls.isEmpty {
+                        // Zeige Cloud-Bilder
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            LazyHStack(spacing: 10) {
+                                ForEach(urls, id: \.self) { url in
+                                    AsyncImage(url: URL(string: url)) { phase in
+                                        switch phase {
+                                        case .empty:
+                                            ProgressView()
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                                .frame(width: 100, height: 100)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                        case .failure:
+                                            Image(systemName: "photo")
+                                                .foregroundColor(.gray)
+                                        @unknown default:
+                                            EmptyView()
+                                        }
+                                    }
+                                    .frame(width: 100, height: 100)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                        .frame(height: 120)
+                    }
+                    
+                    if selectedImages.count < maxImages {
+                        ImagePickerButton(
+                            selectedImages: $selectedImages,
+                            maxImages: maxImages
+                        )
+                    }
+                }
+            }
         }
         .navigationTitle(entry?.title ?? "Neuer Eintrag")
         .navigationBarItems(
@@ -134,10 +195,7 @@ struct JournalEntryView: View {
                 }
                 
                 Button("Fertig") {
-                    if let entry = entry {
-                        viewModel.saveEntry(entry)
-                    }
-                    dismiss()
+                    saveEntry()
                 }
                 .disabled(gratitude.isEmpty && highlight.isEmpty && learning.isEmpty)
             }
@@ -181,11 +239,13 @@ struct JournalEntryView: View {
         } message: {
             Text(viewModel.errorMessage)
         }
+        .onAppear {
+            selectedImages = loadImages() ?? []
+        }
     }
     
     private func saveEntry() {
         guard let userId = Auth.auth().currentUser?.uid else {
-            // Show error alert if not logged in
             viewModel.error = NSError(
                 domain: "JournalEntryView",
                 code: 401,
@@ -203,11 +263,47 @@ struct JournalEntryView: View {
             learning: learning,
             learningNugget: entry?.learningNugget,
             lastModified: Date(),
-            syncStatus: .pendingUpload
+            syncStatus: .pendingUpload,
+            title: entry?.title,
+            content: entry?.content,
+            location: entry?.location,
+            imageURLs: nil,  // Setze URLs auf nil, da sie neu generiert werden
+            localImagePaths: nil  // Setze Pfade auf nil, da sie neu generiert werden
         )
         
-        viewModel.saveEntry(updatedEntry)
-        dismiss()
+        Task {
+            do {
+                if !selectedImages.isEmpty {
+                    let savedEntry = try await viewModel.saveEntryWithImages(updatedEntry, images: selectedImages)
+                    print("Eintrag gespeichert mit URLs: \(String(describing: savedEntry.imageURLs))")
+                    print("Lokale Pfade: \(String(describing: savedEntry.localImagePaths))")
+                    
+                    await MainActor.run {
+                        dismiss()
+                    }
+                } else {
+                    // Wenn keine neuen Bilder ausgewählt wurden, aber der Eintrag bereits Bilder hat
+                    if let existingImages = loadImages(), !existingImages.isEmpty {
+                        let savedEntry = try await viewModel.saveEntryWithImages(updatedEntry, images: existingImages)
+                        print("Eintrag mit bestehenden Bildern gespeichert")
+                        
+                        await MainActor.run {
+                            dismiss()
+                        }
+                    } else {
+                        viewModel.saveEntry(updatedEntry)
+                        await MainActor.run {
+                            dismiss()
+                        }
+                    }
+                }
+            } catch {
+                print("Fehler beim Speichern des Eintrags: \(error)")
+                await MainActor.run {
+                    viewModel.error = error
+                }
+            }
+        }
     }
 }
 

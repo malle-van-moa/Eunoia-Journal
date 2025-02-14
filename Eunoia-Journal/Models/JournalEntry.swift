@@ -9,7 +9,7 @@ import FirebaseCore
 import FirebaseFirestore
 
 struct JournalEntry: Identifiable, Codable {
-    var id: String?
+    let id: String?
     let userId: String
     let date: Date
     var gratitude: String
@@ -23,6 +23,7 @@ struct JournalEntry: Identifiable, Codable {
     var content: String?
     var location: String?
     var imageURLs: [String]?
+    var localImagePaths: [String]?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -39,6 +40,7 @@ struct JournalEntry: Identifiable, Codable {
         case content
         case location
         case imageURLs
+        case localImagePaths
     }
     
     // Custom encoding to handle Timestamp
@@ -83,6 +85,7 @@ struct JournalEntry: Identifiable, Codable {
         try container.encodeIfPresent(content, forKey: .content)
         try container.encodeIfPresent(location, forKey: .location)
         try container.encodeIfPresent(imageURLs, forKey: .imageURLs)
+        try container.encodeIfPresent(localImagePaths, forKey: .localImagePaths)
     }
     
     // Custom decoding to handle Timestamp
@@ -115,15 +118,16 @@ struct JournalEntry: Identifiable, Codable {
         content = try container.decodeIfPresent(String.self, forKey: .content)
         location = try container.decodeIfPresent(String.self, forKey: .location)
         imageURLs = try container.decodeIfPresent([String].self, forKey: .imageURLs)
+        localImagePaths = try container.decodeIfPresent([String].self, forKey: .localImagePaths)
     }
     
     // Convenience initializer
     init(id: String? = nil,
          userId: String,
          date: Date,
-         gratitude: String,
-         highlight: String,
-         learning: String,
+         gratitude: String = "",
+         highlight: String = "",
+         learning: String = "",
          learningNugget: LearningNugget? = nil,
          lastModified: Date = Date(),
          syncStatus: SyncStatus = .pendingUpload,
@@ -131,7 +135,8 @@ struct JournalEntry: Identifiable, Codable {
          title: String? = nil,
          content: String? = nil,
          location: String? = nil,
-         imageURLs: [String]? = nil) {
+         imageURLs: [String]? = nil,
+         localImagePaths: [String]? = nil) {
         self.id = id
         self.userId = userId
         self.date = date
@@ -146,6 +151,7 @@ struct JournalEntry: Identifiable, Codable {
         self.content = content
         self.location = location
         self.imageURLs = imageURLs
+        self.localImagePaths = localImagePaths
     }
 }
 
@@ -175,9 +181,12 @@ extension JournalEntry {
         self.syncStatus = SyncStatus(rawValue: entity.syncStatus ?? "pendingUpload") ?? .pendingUpload
         
         if let nuggetCategory = entity.learningNuggetCategory,
-           let nuggetContent = entity.learningNuggetContent {
+           let nuggetContent = entity.learningNuggetContent,
+           let category = LearningNugget.Category(rawValue: nuggetCategory) {
             self.learningNugget = LearningNugget(
-                category: LearningNugget.Category(rawValue: nuggetCategory) ?? .nature,
+                userId: self.userId,
+                category: category,
+                title: "Lernimpuls",
                 content: nuggetContent,
                 isAddedToJournal: entity.learningNuggetAddedToJournal
             )

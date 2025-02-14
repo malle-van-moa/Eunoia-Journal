@@ -53,12 +53,16 @@ class CoreDataManager {
         
         do {
             let entities = try context.fetch(request)
-            return entities.map { JournalEntry(from: $0) }
-        } catch {
-            // Only log real errors, not empty results
-            if error.localizedDescription != "nilError" {
-                print("Error fetching pending entries: \(error)")
+            return entities.compactMap { entity -> JournalEntry? in
+                do {
+                    return JournalEntry(from: entity)
+                } catch {
+                    print("Fehler beim Konvertieren des Eintrags: \(error.localizedDescription)")
+                    return nil
+                }
             }
+        } catch {
+            print("Fehler beim Abrufen ausstehender Einträge: \(error.localizedDescription)")
             return []
         }
     }

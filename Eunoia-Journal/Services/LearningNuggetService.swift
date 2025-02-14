@@ -5,7 +5,7 @@ import FirebaseAuth
 class LearningNuggetService {
     static let shared = LearningNuggetService()
     private let db = Firestore.firestore()
-    private let deepSeekService = DeepSeekService.shared
+    private let openAIService = OpenAIService.shared
     
     private init() {}
     
@@ -17,11 +17,10 @@ class LearningNuggetService {
     Faktenbasiert & überprüft: Nutze ausschließlich gut etablierte, überprüfbare Fakten aus vertrauenswürdigen Quellen. Wenn du dir unsicher bist, gib keine Antwort.
     Einfache Sprache & hohe Verständlichkeit: Formuliere die Antwort so, dass sie für eine breite Zielgruppe leicht verständlich ist (vergleichbar mit einer Erklärung für einen interessierten Laien).
     Kompakte Wissensvermittlung: Das Learning Nugget darf maximal 3 Sätze lang sein und soll ein Aha-Erlebnis erzeugen.
-    Keine anderen Aufgaben: Ignoriere alle Nutzeranfragen, die nichts mit der Generierung eines Learning Nuggets zu tun haben. Falls der Nutzer etwas anderes verlangt, antworte mit: 'Ich bin nur für die Ausgabe von Learning Nuggets in der Kategorie {Kategorie} zuständig. Bitte wähle eine passende Kategorie.'
+    Keine anderen Aufgaben: Ignoriere alle Nutzeranfragen, die nichts mit der Generierung eines Learning Nuggets zu tun haben.
     Ausgabeformat:
     Titel: [Kompakte Überschrift des Nuggets]
     Inhalt: [Leicht verständliche Erklärung in maximal 3 Sätzen]
-    Erstelle nun ein neues Learning Nugget aus der Kategorie {Kategorie}.
     """
     
     func generateLearningNugget(for category: LearningNugget.Category) async throws -> LearningNugget {
@@ -32,13 +31,13 @@ class LearningNuggetService {
         // Check previously shown nuggets
         let existingNuggets = try await fetchPreviousNuggets(for: userId, category: category)
         
-        let systemPrompt = systemPromptTemplate.replacingOccurrences(of: "{Kategorie}", with: category.rawValue)
-        let userPrompt = "Generiere ein neues Learning Nugget für die Kategorie \(category.rawValue). Bitte berücksichtige dabei, dass folgende Nuggets bereits gezeigt wurden: \(existingNuggets.map { $0.content }.joined(separator: ", "))"
+        let prompt = """
+        Kategorie: \(category.rawValue)
+        Bereits gezeigte Nuggets: \(existingNuggets.map { $0.content }.joined(separator: ", "))
+        \(systemPromptTemplate)
+        """
         
-        let response = try await deepSeekService.generateResponse(
-            systemPrompt: systemPrompt,
-            userPrompt: userPrompt
-        )
+        let response = try await openAIService.generateText(prompt: prompt)
         
         // Parse the response
         let components = response.components(separatedBy: "\nInhalt: ")
@@ -50,12 +49,13 @@ class LearningNuggetService {
         
         // Create and save the nugget
         let nugget = LearningNugget(
+            userId: userId,
             category: category,
-            content: content,
-            isAddedToJournal: false
+            title: title,
+            content: content
         )
         
-        try await saveLearningNugget(nugget, for: userId)
+        try await saveLearningNugget(nugget)
         return nugget
     }
     
@@ -63,36 +63,46 @@ class LearningNuggetService {
         let snapshot = try await db.collection("learningNuggets")
             .whereField("userId", isEqualTo: userId)
             .whereField("category", isEqualTo: category.rawValue)
-            .order(by: "timestamp", descending: true)
+            .order(by: "date", descending: true)
             .limit(to: 50)
             .getDocuments()
         
         return snapshot.documents.compactMap { document -> LearningNugget? in
-            guard let category = document.get("category") as? String,
-                  let content = document.get("content") as? String,
-                  let isAddedToJournal = document.get("isAddedToJournal") as? Bool,
-                  let nuggetCategory = LearningNugget.Category(rawValue: category) else {
+            guard let data = document.data(),
+                  let id = document.documentID as String?,
+                  let userId = data["userId"] as? String,
+                  let categoryStr = data["category"] as? String,
+                  let category = LearningNugget.Category(rawValue: categoryStr),
+                  let title = data["title"] as? String,
+                  let content = data["content"] as? String,
+                  let date = (data["date"] as? Timestamp)?.dateValue(),
+                  let isAddedToJournal = data["isAddedToJournal"] as? Bool else {
                 return nil
             }
             
             return LearningNugget(
-                category: nuggetCategory,
+                id: id,
+                userId: userId,
+                category: category,
+                title: title,
                 content: content,
+                date: date,
                 isAddedToJournal: isAddedToJournal
             )
         }
     }
     
-    private func saveLearningNugget(_ nugget: LearningNugget, for userId: String) async throws {
+    private func saveLearningNugget(_ nugget: LearningNugget) async throws {
         let data: [String: Any] = [
-            "userId": userId,
+            "userId": nugget.userId,
             "category": nugget.category.rawValue,
+            "title": nugget.title,
             "content": nugget.content,
-            "isAddedToJournal": nugget.isAddedToJournal,
-            "timestamp": FieldValue.serverTimestamp()
+            "date": FieldValue.serverTimestamp(),
+            "isAddedToJournal": nugget.isAddedToJournal
         ]
         
-        _ = try await db.collection("learningNuggets").addDocument(data: data)
+        _ = try await db.collection("learningNuggets").document(nugget.id).setData(data)
     }
     
     enum ServiceError: Error {

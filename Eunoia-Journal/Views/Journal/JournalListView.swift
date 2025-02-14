@@ -1,5 +1,7 @@
-import SwiftUI
+#if canImport(JournalingSuggestions)
 import JournalingSuggestions
+#endif
+import SwiftUI
 
 @available(iOS 17.0, *)
 struct JournalListView: View {
@@ -10,6 +12,7 @@ struct JournalListView: View {
     @State private var showingDatePicker = false
     @State private var selectedDate = Date()
     @State private var showingSuggestionsPicker = false
+    @State private var selectedImages: [UIImage] = []
     
     private var filteredEntries: [JournalEntry] {
         if searchText.isEmpty {
@@ -65,11 +68,15 @@ struct JournalListView: View {
             )
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showingSuggestionsPicker = true
-                    }) {
-                        Image(systemName: "lightbulb")
+                    #if canImport(JournalingSuggestions)
+                    if #available(iOS 17.2, *) {
+                        Button(action: {
+                            showingSuggestionsPicker = true
+                        }) {
+                            Image(systemName: "lightbulb")
+                        }
                     }
+                    #endif
                 }
             }
             .sheet(isPresented: $showingNewEntry) {
@@ -90,33 +97,58 @@ struct JournalListView: View {
                     }
                 }
             }
+            #if canImport(JournalingSuggestions)
             .sheet(isPresented: $showingSuggestionsPicker) {
-                NavigationView {
-                    JournalingSuggestionsPicker(label: {
-                        Text("Vorschläge")
-                    }, onCompletion: { suggestion in
-                        Task {
-                            do {
-                                try await viewModel.createEntryFromSuggestion(suggestion)
-                                await MainActor.run {
-                                    showingSuggestionsPicker = false
+                if #available(iOS 17.2, *) {
+                    NavigationView {
+                        VStack {
+                            JournalingSuggestionsPicker(label: {
+                                Text("Vorschläge")
+                            }, onCompletion: { suggestion in
+                                Task {
+                                    do {
+                                        let entry = try await viewModel.createEntryFromSuggestion(suggestion)
+                                        if !selectedImages.isEmpty {
+                                            _ = try await viewModel.saveEntryWithImages(entry, images: selectedImages)
+                                        }
+                                        await MainActor.run {
+                                            selectedImages = []
+                                            showingSuggestionsPicker = false
+                                        }
+                                    } catch {
+                                        print("Fehler beim Erstellen des Eintrags: \(error)")
+                                        await MainActor.run {
+                                            selectedImages = []
+                                            showingSuggestionsPicker = false
+                                        }
+                                    }
                                 }
-                            } catch {
-                                print("Fehler beim Erstellen des Eintrags: \(error)")
-                                // Zeige dem Benutzer einen Fehler an
-                                await MainActor.run {
-                                    // TODO: Implementiere eine Fehleranzeige
-                                    showingSuggestionsPicker = false
+                            })
+                            
+                            if selectedImages.count < 5 {
+                                ImagePickerButton(
+                                    selectedImages: $selectedImages,
+                                    maxImages: 5
+                                )
+                                .padding()
+                            }
+                            
+                            if !selectedImages.isEmpty {
+                                ImageGalleryView(images: selectedImages) { index in
+                                    selectedImages.remove(at: index)
                                 }
+                                .frame(height: 120)
+                                .padding(.horizontal)
                             }
                         }
-                    })
-                    .navigationTitle("Vorschläge")
-                    .navigationBarItems(trailing: Button("Fertig") {
-                        showingSuggestionsPicker = false
-                    })
+                        .navigationTitle("Vorschläge")
+                        .navigationBarItems(trailing: Button("Fertig") {
+                            showingSuggestionsPicker = false
+                        })
+                    }
                 }
             }
+            #endif
         }
     }
 }
@@ -183,34 +215,96 @@ struct JournalEntryRow: View {
                 }
             }
             
-            if let imageURLs = entry.imageURLs, !imageURLs.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack {
-                        ForEach(imageURLs, id: \.self) { url in
-                            AsyncImage(url: URL(string: url)) { phase in
-                                switch phase {
-                                case .empty:
-                                    ProgressView()
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 60, height: 60)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                case .failure:
-                                    Image(systemName: "photo")
-                                        .foregroundColor(.gray)
-                                @unknown default:
-                                    EmptyView()
-                                }
-                            }
-                            .frame(width: 60, height: 60)
-                        }
-                    }
+            // Bilder-Anzeige mit Fallback-Logik
+            Group {
+                if let imageURLs = entry.imageURLs, !imageURLs.isEmpty {
+                    // Cloud-Bilder
+                    ImageScrollView(urls: imageURLs)
+                } else if let localPaths = entry.localImagePaths, !localPaths.isEmpty {
+                    // Lokale Bilder
+                    LocalImageScrollView(paths: localPaths)
                 }
             }
         }
         .padding(.vertical, 8)
+    }
+}
+
+struct ImageScrollView: View {
+    let urls: [String]
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(urls, id: \.self) { url in
+                    AsyncImage(url: URL(string: url)) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .frame(width: 60, height: 60)
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        case .failure:
+                            VStack {
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                                Text("Fehler")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(width: 60, height: 60)
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .frame(width: 60, height: 60)
+                }
+            }
+        }
+    }
+}
+
+struct LocalImageScrollView: View {
+    let paths: [String]
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack {
+                ForEach(paths, id: \.self) { path in
+                    Group {
+                        if let image = loadImage(from: path) {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 60, height: 60)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        } else {
+                            VStack {
+                                Image(systemName: "photo")
+                                    .foregroundColor(.gray)
+                                Text("Nicht verfügbar")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(width: 60, height: 60)
+                        }
+                    }
+                    .frame(width: 60, height: 60)
+                }
+            }
+        }
+    }
+    
+    private func loadImage(from path: String) -> UIImage? {
+        guard let imageData = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              let image = UIImage(data: imageData) else {
+            return nil
+        }
+        return image
     }
 }
 
