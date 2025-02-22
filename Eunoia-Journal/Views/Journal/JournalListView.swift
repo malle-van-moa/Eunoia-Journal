@@ -23,133 +23,134 @@ struct JournalListView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Background
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
+        ZStack {
+            // Background
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Streak Banner
+                StreakBannerView(streak: viewModel.calculateCurrentStreak())
                 
-                VStack(spacing: 0) {
-                    // Streak Banner
-                    StreakBannerView(streak: viewModel.calculateCurrentStreak())
-                    
-                    // Search and Filter
-                    SearchBar(text: $searchText)
-                        .padding()
-                    
-                    // Journal Entries List
-                    if filteredEntries.isEmpty {
-                        EmptyStateView()
-                    } else {
-                        List {
-                            ForEach(filteredEntries) { entry in
-                                JournalEntryRow(entry: entry)
-                                    .onTapGesture {
-                                        selectedEntry = entry
-                                    }
-                            }
+                // Search and Filter
+                SearchBar(text: $searchText)
+                    .padding()
+                
+                // Journal Entries List
+                if filteredEntries.isEmpty {
+                    EmptyStateView()
+                } else {
+                    List {
+                        ForEach(filteredEntries) { entry in
+                            JournalEntryRow(entry: entry)
+                                .onTapGesture {
+                                    selectedEntry = entry
+                                }
                         }
-                        .listStyle(InsetGroupedListStyle())
                     }
+                    .listStyle(InsetGroupedListStyle())
+                    .background(Color(.systemBackground))
                 }
             }
-            .navigationTitle("Journal")
-            .navigationBarItems(
-                leading: Button(action: {
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
                     showingDatePicker.toggle()
                 }) {
                     Image(systemName: "calendar")
-                },
-                trailing: Button(action: {
+                }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
                     showingNewEntry.toggle()
                 }) {
                     Image(systemName: "square.and.pencil")
                 }
-            )
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    #if canImport(JournalingSuggestions)
-                    if #available(iOS 17.2, *) {
-                        Button(action: {
-                            showingSuggestionsPicker = true
-                        }) {
-                            Image(systemName: "lightbulb")
-                        }
-                    }
-                    #endif
-                }
-            }
-            .sheet(isPresented: $showingNewEntry) {
-                NavigationView {
-                    JournalEntryView(viewModel: viewModel)
-                }
-            }
-            .sheet(item: $selectedEntry) { entry in
-                NavigationView {
-                    JournalEntryView(viewModel: viewModel, entry: entry)
-                }
-            }
-            .sheet(isPresented: $showingDatePicker) {
-                DatePickerView(selectedDate: $selectedDate) { date in
-                    let entries = viewModel.entriesByDate(date: date)
-                    if let firstEntry = entries.first {
-                        selectedEntry = firstEntry
-                    }
-                }
             }
             #if canImport(JournalingSuggestions)
-            .sheet(isPresented: $showingSuggestionsPicker) {
-                if #available(iOS 17.2, *) {
-                    NavigationView {
-                        VStack {
-                            JournalingSuggestionsPicker(label: {
-                                Text("Vorschläge")
-                            }, onCompletion: { suggestion in
-                                Task {
-                                    do {
-                                        let entry = try await viewModel.createEntryFromSuggestion(suggestion)
-                                        if !selectedImages.isEmpty {
-                                            _ = try await viewModel.saveEntryWithImages(entry, images: selectedImages)
-                                        }
-                                        await MainActor.run {
-                                            selectedImages = []
-                                            showingSuggestionsPicker = false
-                                        }
-                                    } catch {
-                                        print("Fehler beim Erstellen des Eintrags: \(error)")
-                                        await MainActor.run {
-                                            selectedImages = []
-                                            showingSuggestionsPicker = false
-                                        }
-                                    }
-                                }
-                            })
-                            
-                            if selectedImages.count < 5 {
-                                ImagePickerButton(
-                                    selectedImages: $selectedImages,
-                                    maxImages: 5
-                                )
-                                .padding()
-                            }
-                            
-                            if !selectedImages.isEmpty {
-                                ImageGalleryView(images: selectedImages) { index in
-                                    selectedImages.remove(at: index)
-                                }
-                                .frame(height: 120)
-                                .padding(.horizontal)
-                            }
-                        }
-                        .navigationTitle("Vorschläge")
-                        .navigationBarItems(trailing: Button("Fertig") {
-                            showingSuggestionsPicker = false
-                        })
+            if #available(iOS 17.2, *) {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        showingSuggestionsPicker = true
+                    }) {
+                        Image(systemName: "lightbulb")
                     }
                 }
             }
             #endif
         }
+        .sheet(isPresented: $showingNewEntry) {
+            NavigationView {
+                JournalEntryView(viewModel: viewModel)
+            }
+        }
+        .sheet(item: $selectedEntry) { entry in
+            NavigationView {
+                JournalEntryView(viewModel: viewModel, entry: entry)
+            }
+        }
+        .sheet(isPresented: $showingDatePicker) {
+            DatePickerView(selectedDate: $selectedDate) { date in
+                let entries = viewModel.entriesByDate(date: date)
+                if let firstEntry = entries.first {
+                    selectedEntry = firstEntry
+                }
+            }
+        }
+        #if canImport(JournalingSuggestions)
+        .sheet(isPresented: $showingSuggestionsPicker) {
+            if #available(iOS 17.2, *) {
+                NavigationView {
+                    VStack {
+                        JournalingSuggestionsPicker(label: {
+                            Text("Vorschläge")
+                        }, onCompletion: { suggestion in
+                            Task {
+                                do {
+                                    let entry = try await viewModel.createEntryFromSuggestion(suggestion)
+                                    if !selectedImages.isEmpty {
+                                        _ = try await viewModel.saveEntryWithImages(entry, images: selectedImages)
+                                    }
+                                    await MainActor.run {
+                                        selectedImages = []
+                                        showingSuggestionsPicker = false
+                                    }
+                                } catch {
+                                    print("Fehler beim Erstellen des Eintrags: \(error)")
+                                    await MainActor.run {
+                                        selectedImages = []
+                                        showingSuggestionsPicker = false
+                                    }
+                                }
+                            }
+                        })
+                        
+                        if selectedImages.count < 5 {
+                            ImagePickerButton(
+                                selectedImages: $selectedImages,
+                                maxImages: 5
+                            )
+                            .padding()
+                        }
+                        
+                        if !selectedImages.isEmpty {
+                            ImageGalleryView(images: selectedImages) { index in
+                                selectedImages.remove(at: index)
+                            }
+                            .frame(height: 120)
+                            .padding(.horizontal)
+                        }
+                    }
+                    .navigationTitle("Vorschläge")
+                    .navigationBarItems(trailing: Button("Fertig") {
+                        showingSuggestionsPicker = false
+                    })
+                }
+            }
+        }
+        #endif
     }
 }
 
@@ -213,6 +214,10 @@ struct JournalEntryRow: View {
                     Text(location)
                         .font(.caption)
                 }
+            }
+            
+            if let learningNugget = entry.learningNugget {
+                JournalListLearningNuggetView(nugget: learningNugget)
             }
             
             // Bilder-Anzeige mit Fallback-Logik
@@ -350,6 +355,31 @@ struct DatePickerView: View {
                 }
             )
         }
+    }
+}
+
+struct JournalListLearningNuggetView: View {
+    let nugget: LearningNugget
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .foregroundColor(.yellow)
+                Text("Lernimpuls")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            Text(nugget.content)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .lineLimit(3)
+        }
+        .padding(.vertical, 4)
+        .padding(.horizontal, 8)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(8)
     }
 }
 
