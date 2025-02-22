@@ -21,19 +21,35 @@ class SyncManager {
     
     // MARK: - Sync Methods
     
-    func syncOfflineEntries() {
+    func syncOfflineEntries() async throws {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        let pendingEntries = coreDataManager.fetchPendingEntries(for: userId)
+        let pendingEntries = try coreDataManager.fetchPendingEntries(for: userId)
         
         for entry in pendingEntries {
-            Task {
-                do {
-                    try await firebaseService.saveJournalEntry(entry)
-                    print("✅ Entry successfully synced to Firestore: \(entry.id ?? "unknown")")
-                } catch {
-                    print("❌ Error syncing entry: \(error.localizedDescription)")
-                }
+            do {
+                try await syncSingleEntry(entry)
+            } catch {
+                print("❌ Failed to sync entry \(entry.id ?? "unknown"): \(error)")
+                throw error  // Propagate the error up
+            }
+        }
+    }
+    
+    private func syncSingleEntry(_ entry: JournalEntry) async throws {
+        do {
+            try await firebaseService.saveJournalEntry(entry)
+            print("✅ Entry successfully synced to Firestore: \(entry.id ?? "unknown")")
+        } catch {
+            print("❌ Error syncing entry: \(error.localizedDescription)")
+            // Exponentieller Backoff für Retry
+            try await Task.sleep(nanoseconds: 5_000_000_000) // 5 Sekunden Wartezeit
+            do {
+                try await firebaseService.saveJournalEntry(entry)
+                print("✅ Retry successful for entry: \(entry.id ?? "unknown")")
+            } catch {
+                print("❌ Final retry failed for entry: \(entry.id ?? "unknown")")
+                throw error // Propagate the error up
             }
         }
     }
@@ -43,7 +59,13 @@ class SyncManager {
         Timer.publish(every: 300, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.syncOfflineEntries()
+                Task {
+                    do {
+                        try await self?.syncOfflineEntries()
+                    } catch {
+                        print("❌ Auto-Sync fehlgeschlagen: \(error.localizedDescription)")
+                    }
+                }
             }
             .store(in: &cancellables)
     }

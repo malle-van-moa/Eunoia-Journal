@@ -14,22 +14,41 @@ class FirebaseService {
     private let journalService = JournalService.shared
     private let visionBoardService = VisionBoardService.shared
     private let coreDataManager = CoreDataManager.shared
-    private let db = Firestore.firestore()
-    private var networkMonitor: NetworkMonitor?
+    private let db: Firestore
+    private let networkMonitor = NetworkMonitor.shared
     
     private init() {
+        // Konfiguriere Firestore
+        let settings = FirestoreSettings()
+        settings.isPersistenceEnabled = true
+        
+        // Cache-Größe als NSNumber (100 MB)
+        let cacheSize: Int64 = 100 * 1024 * 1024
+        settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: cacheSize))
+        
+        let db = Firestore.firestore()
+        db.settings = settings
+        self.db = db
+        
         setupNetworkMonitoring()
+        
+        #if DEBUG
+        print("Firestore konfiguriert mit Persistence und \(cacheSize / 1024 / 1024) MB Cache")
+        #endif
     }
     
     private func setupNetworkMonitoring() {
-        networkMonitor = NetworkMonitor()
-        networkMonitor?.startMonitoring()
+        networkMonitor.startMonitoring { [weak self] isConnected in
+            if isConnected {
+                self?.syncLocalData()
+            }
+        }
     }
     
     // MARK: - Network State
     
     private func ensureNetworkConnection() throws {
-        guard networkMonitor?.isConnected == true else {
+        guard networkMonitor.isNetworkAvailable else {
             throw NetworkError.noConnection
         }
     }
@@ -104,7 +123,7 @@ class FirebaseService {
         Task {
             do {
                 // Sync journal entries
-                let pendingEntries = coreDataManager.fetchPendingEntries(for: userId)
+                let pendingEntries = try coreDataManager.fetchPendingEntries(for: userId)
                 for entry in pendingEntries {
                     do {
                         try await journalService.saveJournalEntry(entry)
