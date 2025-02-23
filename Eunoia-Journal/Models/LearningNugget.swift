@@ -1,6 +1,6 @@
 import Foundation
 
-struct LearningNugget: Identifiable, Codable {
+struct LearningNugget: Identifiable, Codable, Equatable {
     let id: String
     let userId: String
     let category: Category
@@ -18,6 +18,7 @@ struct LearningNugget: Identifiable, Codable {
         case kreativität = "Kreativität"
         case achtsamkeit = "Achtsamkeit"
         case karriere = "Karriere"
+        case aiGenerated = "KI-generiert"
     }
     
     init(id: String = UUID().uuidString,
@@ -34,5 +35,16 @@ struct LearningNugget: Identifiable, Codable {
         self.content = content
         self.date = date
         self.isAddedToJournal = isAddedToJournal
+    }
+    
+    // MARK: - Equatable
+    static func == (lhs: LearningNugget, rhs: LearningNugget) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.userId == rhs.userId &&
+        lhs.category == rhs.category &&
+        lhs.title == rhs.title &&
+        lhs.content == rhs.content &&
+        lhs.date == rhs.date &&
+        lhs.isAddedToJournal == rhs.isAddedToJournal
     }
 } 

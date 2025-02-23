@@ -111,57 +111,60 @@ struct DashboardView: View {
                             }
                             
                             // Main Functions Grid
-                            HStack(spacing: 16) {
-                                // Journal Card
-                                Button {
-                                    print("Journal tapped")
-                                    withAnimation {
-                                        showingDashboard = false
+                            GeometryReader { geometry in
+                                HStack(spacing: 16) {
+                                    // Journal Card
+                                    Button {
+                                        print("Journal tapped")
+                                        withAnimation {
+                                            showingDashboard = false
+                                        }
+                                    } label: {
+                                        DashboardCard(
+                                            title: "Journal",
+                                            systemImage: "book.fill",
+                                            gradient: Gradient(colors: [.blue.opacity(0.4), .cyan.opacity(0.4)])
+                                        ) {
+                                            Text("Starte deinen Tag mit Reflexion")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(2)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .frame(height: 40)
+                                        }
                                     }
-                                } label: {
-                                    DashboardCard(
-                                        title: "Journal",
-                                        systemImage: "book.fill",
-                                        gradient: Gradient(colors: [.blue.opacity(0.4), .cyan.opacity(0.4)])
-                                    ) {
-                                        Text("Starte deinen Tag mit Reflexion")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(2)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .frame(height: 40)
+                                    .buttonStyle(PlainButtonStyle())
+                                    .frame(width: (geometry.size.width - 48) / 2)
+                                    .frame(height: 110)
+                                    
+                                    // Vision Board Card
+                                    Button {
+                                        print("Vision Board tapped")
+                                        withAnimation {
+                                            selectedTab = 2
+                                            showingDashboard = false
+                                        }
+                                    } label: {
+                                        DashboardCard(
+                                            title: "Vision Board",
+                                            systemImage: "star.fill",
+                                            gradient: Gradient(colors: [.purple.opacity(0.4), .pink.opacity(0.4)])
+                                        ) {
+                                            Text("Manifestiere deine Vision")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                                .lineLimit(2)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .frame(height: 40)
+                                        }
                                     }
+                                    .buttonStyle(PlainButtonStyle())
+                                    .frame(width: (geometry.size.width - 48) / 2)
+                                    .frame(height: 110)
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .frame(minWidth: 0, maxWidth: .infinity)
-                                .frame(height: 110)
-                                
-                                // Vision Board Card
-                                Button {
-                                    print("Vision Board tapped")
-                                    withAnimation {
-                                        selectedTab = 2
-                                        showingDashboard = false
-                                    }
-                                } label: {
-                                    DashboardCard(
-                                        title: "Vision Board",
-                                        systemImage: "star.fill",
-                                        gradient: Gradient(colors: [.purple.opacity(0.4), .pink.opacity(0.4)])
-                                    ) {
-                                        Text("Manifestiere deine Vision")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(2)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .frame(height: 40)
-                                    }
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                .frame(minWidth: 0, maxWidth: .infinity)
-                                .frame(height: 110)
+                                .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 16)
                             }
-                            .padding(.horizontal)
                         }
                         .padding(.horizontal)
                         .padding(.top, -100)

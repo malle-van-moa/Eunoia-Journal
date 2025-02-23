@@ -37,21 +37,13 @@ class LearningNuggetService {
         \(systemPromptTemplate)
         """
         
-        let response = try await openAIService.generateText(prompt: prompt)
-        
-        // Parse the response
-        let components = response.components(separatedBy: "\nInhalt: ")
-        guard components.count == 2,
-              let title = components[0].split(separator: ":").last?.trimmingCharacters(in: .whitespaces),
-              let content = components[1].trimmingCharacters(in: .whitespaces).components(separatedBy: "\n").first else {
-            throw ServiceError.invalidResponse
-        }
+        let content = try await openAIService.generateText(prompt: prompt)
         
         // Create and save the nugget
         let nugget = LearningNugget(
             userId: userId,
             category: category,
-            title: title,
+            title: "Lernimpuls",
             content: content
         )
         
@@ -68,9 +60,8 @@ class LearningNuggetService {
             .getDocuments()
         
         return snapshot.documents.compactMap { document -> LearningNugget? in
-            guard let data = document.data(),
-                  let id = document.documentID as String?,
-                  let userId = data["userId"] as? String,
+            let data = document.data()
+            guard let userId = data["userId"] as? String,
                   let categoryStr = data["category"] as? String,
                   let category = LearningNugget.Category(rawValue: categoryStr),
                   let title = data["title"] as? String,
@@ -81,7 +72,7 @@ class LearningNuggetService {
             }
             
             return LearningNugget(
-                id: id,
+                id: document.documentID,
                 userId: userId,
                 category: category,
                 title: title,

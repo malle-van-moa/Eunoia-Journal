@@ -18,11 +18,50 @@ typealias StorageHandle = Int
 class JournalService {
     static let shared = JournalService()
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Eunoia", category: "JournalService")
-    
-    private let db = Firestore.firestore()
+    private let networkMonitor = NetworkMonitor.shared
+    private let db: Firestore
     private let coreDataManager = CoreDataManager.shared
+    private var retryCount = 0
+    private let maxRetries = 3
     
-    private init() {}
+    private init() {
+        // Konfiguriere Firestore
+        let settings = FirestoreSettings()
+        settings.isPersistenceEnabled = true
+        
+        // Cache-Größe als NSNumber (100 MB)
+        let cacheSize: Int64 = 100 * 1024 * 1024
+        settings.cacheSettings = PersistentCacheSettings(sizeBytes: NSNumber(value: cacheSize))
+        
+        let db = Firestore.firestore()
+        db.settings = settings
+        self.db = db
+        
+        #if DEBUG
+        logger.info("Firestore konfiguriert mit Persistence und \(cacheSize / 1024 / 1024) MB Cache")
+        #endif
+    }
+    
+    private func handleFirestoreError(_ error: Error) async throws {
+        if let firestoreError = error as NSError? {
+            switch firestoreError.code {
+            case 8: // RESOURCE_EXHAUSTED
+                if retryCount < maxRetries {
+                    retryCount += 1
+                    try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(retryCount)) * 1_000_000_000))
+                    // Operation wird automatisch wiederholt
+                } else {
+                    throw FirebaseError.resourceExhausted
+                }
+            case 14: // UNAVAILABLE
+                if !networkMonitor.isNetworkAvailable {
+                    throw NetworkError.noConnection
+                }
+            default:
+                throw error
+            }
+        }
+    }
     
     // MARK: - Journal Entries
     
@@ -31,53 +70,73 @@ class JournalService {
             throw FirebaseError.invalidData("Entry ID is missing")
         }
         
-        var dict: [String: Any] = [
-            "userId": entry.userId,
-            "date": Timestamp(date: entry.date),
-            "gratitude": entry.gratitude,
-            "highlight": entry.highlight,
-            "learning": entry.learning,
-            "lastModified": Timestamp(date: entry.lastModified),
-            "syncStatus": entry.syncStatus.rawValue
-        ]
-        
-        // Add optional fields
-        if let title = entry.title {
-            dict["title"] = title
-        }
-        if let content = entry.content {
-            dict["content"] = content
-        }
-        if let location = entry.location {
-            dict["location"] = location
-        }
-        if let learningNugget = entry.learningNugget {
-            let nuggetDict: [String: Any] = [
-                "category": learningNugget.category.rawValue,
-                "content": learningNugget.content,
-                "isAddedToJournal": learningNugget.isAddedToJournal
-            ]
-            dict["learningNugget"] = nuggetDict
-        }
-        if let imageURLs = entry.imageURLs {
-            dict["imageURLs"] = imageURLs
-        }
-        if let localImagePaths = entry.localImagePaths {
-            dict["localImagePaths"] = localImagePaths
+        // Speichere zuerst lokal mit Fehlerbehandlung
+        do {
+            try coreDataManager.saveJournalEntry(entry)
+        } catch {
+            logger.error("Fehler beim lokalen Speichern: \(error.localizedDescription)")
+            throw FirebaseError.storageError("Lokales Speichern fehlgeschlagen: \(error.localizedDescription)")
         }
         
-        // Add server timestamp
-        dict["serverTimestamp"] = FieldValue.serverTimestamp()
+        // Wenn offline, beende hier
+        guard networkMonitor.isNetworkAvailable else {
+            logger.info("Offline mode: Entry saved locally")
+            return
+        }
         
         do {
-            try await db.collection("journalEntries").document(id).setData(dict)
+            var dict: [String: Any] = [
+                "userId": entry.userId,
+                "date": Timestamp(date: entry.date),
+                "gratitude": entry.gratitude,
+                "highlight": entry.highlight,
+                "learning": entry.learning,
+                "lastModified": Timestamp(date: entry.lastModified),
+                "syncStatus": entry.syncStatus.rawValue,
+                "serverTimestamp": FieldValue.serverTimestamp()
+            ]
             
-            // Update local entry status to synced
-            var updatedEntry = entry
-            updatedEntry.syncStatus = .synced
-            coreDataManager.saveJournalEntry(updatedEntry)
+            // Optional fields mit Validierung
+            if let title = entry.title, !title.isEmpty { dict["title"] = title }
+            if let content = entry.content, !content.isEmpty { dict["content"] = content }
+            if let location = entry.location, !location.isEmpty { dict["location"] = location }
+            if let learningNugget = entry.learningNugget {
+                dict["learningNugget"] = [
+                    "category": learningNugget.category.rawValue,
+                    "content": learningNugget.content,
+                    "isAddedToJournal": learningNugget.isAddedToJournal
+                ]
+            }
+            if let imageURLs = entry.imageURLs, !imageURLs.isEmpty { dict["imageURLs"] = imageURLs }
+            
+            // Implementiere Retry-Logik mit exponentieller Verzögerung
+            var attempt = 0
+            var lastError: Error?
+            
+            while attempt < self.maxRetries {
+                do {
+                    try await self.db.collection("journalEntries").document(id).setData(dict)
+                    self.retryCount = 0 // Reset retry count after successful operation
+                    return
+                } catch {
+                    lastError = error
+                    attempt += 1
+                    
+                    if attempt < self.maxRetries {
+                        // Exponential backoff: 0.5s, 1s, 2s
+                        let delay = Double(pow(2.0, Double(attempt - 1))) * 0.5
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    }
+                }
+            }
+            
+            // Wenn alle Versuche fehlgeschlagen sind
+            self.logger.error("Alle Speicherversuche fehlgeschlagen nach \(self.maxRetries) Versuchen")
+            throw lastError ?? FirebaseError.storageError("Unbekannter Fehler beim Speichern")
+            
         } catch {
-            throw FirebaseError.saveFailed("Failed to save entry: \(error.localizedDescription)")
+            logger.error("Error saving entry: \(error.localizedDescription)")
+            throw FirebaseError.storageError("Firebase Speicherfehler: \(error.localizedDescription)")
         }
     }
     
@@ -113,7 +172,9 @@ class JournalService {
                        let content = nuggetData["content"] as? String,
                        let isAddedToJournal = nuggetData["isAddedToJournal"] as? Bool {
                         learningNugget = LearningNugget(
+                            userId: userId,
                             category: category,
+                            title: "Lernimpuls",
                             content: content,
                             isAddedToJournal: isAddedToJournal
                         )
@@ -166,7 +227,9 @@ class JournalService {
                            let content = nuggetData["content"] as? String,
                            let isAddedToJournal = nuggetData["isAddedToJournal"] as? Bool {
                             learningNugget = LearningNugget(
+                                userId: userId,
                                 category: category,
+                                title: "Lernimpuls",
                                 content: content,
                                 isAddedToJournal: isAddedToJournal
                             )
@@ -242,7 +305,9 @@ class JournalService {
                        let content = nuggetData["content"] as? String,
                        let isAddedToJournal = nuggetData["isAddedToJournal"] as? Bool {
                         learningNugget = LearningNugget(
+                            userId: userId,
                             category: category,
+                            title: "Lernimpuls",
                             content: content,
                             isAddedToJournal: isAddedToJournal
                         )
@@ -281,15 +346,59 @@ class JournalService {
             throw FirebaseError.invalidData("User ID ist nicht verfügbar")
         }
         
-        // Versuche den aktuellen Standort zu erhalten
         var locationString: String? = nil
+        
+        // Verbesserte Standortabfrage
         do {
-            locationString = try await LocationManager.shared.getCurrentLocationString()
+            let locationManager = LocationManager.shared
+            
+            // Prüfe zuerst den Autorisierungsstatus
+            let authStatus = locationManager.authorizationStatus
+            
+            switch authStatus {
+            case .authorizedWhenInUse, .authorizedAlways:
+                // Nur wenn bereits autorisiert, starte die Standortabfrage
+                locationManager.startUpdatingLocation()
+                do {
+                    locationString = try await withTimeout(seconds: 5) {
+                        try await locationManager.getCurrentLocationString()
+                    }
+                } catch {
+                    logger.warning("Timeout bei Standortabfrage: \(error.localizedDescription)")
+                }
+            case .notDetermined:
+                // Beantrage Berechtigung und warte maximal 3 Sekunden
+                locationManager.requestAuthorization()
+                for _ in 0..<6 {
+                    if locationManager.authorizationStatus != .notDetermined {
+                        break
+                    }
+                    try await Task.sleep(nanoseconds: 500_000_000)
+                }
+                
+                if locationManager.authorizationStatus == .authorizedWhenInUse || 
+                   locationManager.authorizationStatus == .authorizedAlways {
+                    locationManager.startUpdatingLocation()
+                    do {
+                        locationString = try await withTimeout(seconds: 5) {
+                            try await locationManager.getCurrentLocationString()
+                        }
+                    } catch {
+                        logger.warning("Timeout bei Standortabfrage nach Autorisierung: \(error.localizedDescription)")
+                    }
+                }
+            case .restricted:
+                logger.warning("Standortzugriff ist eingeschränkt")
+            case .denied:
+                logger.warning("Standortzugriff wurde verweigert")
+            @unknown default:
+                logger.warning("Unbekannter Autorisierungsstatus")
+            }
         } catch {
-            logger.error("Fehler beim Abrufen des Standorts: \(error.localizedDescription)")
+            logger.warning("Fehler bei Standortabfrage: \(error)")
         }
         
-        // Erstelle einen neuen Eintrag mit den verfügbaren Informationen
+        // Erstelle einen neuen Eintrag
         let entry = JournalEntry(
             id: UUID().uuidString,
             userId: userId,
@@ -297,14 +406,50 @@ class JournalService {
             gratitude: "",
             highlight: suggestion.title,
             learning: "",
+            learningNugget: nil,
+            lastModified: Date(),
+            syncStatus: .pendingUpload,
             title: suggestion.title,
             content: suggestion.title,
-            location: locationString,
-            imageURLs: nil
+            location: locationString
         )
         
-        try await saveJournalEntry(entry)
-        return entry
+        // Speichere zuerst in CoreData
+        do {
+            try await Task.sleep(nanoseconds: 100_000_000) // Kleine Verzögerung für bessere Stabilität
+            try coreDataManager.saveJournalEntry(entry)
+            
+            // Wenn online, speichere auch in Firebase
+            if NetworkMonitor.shared.isConnected {
+                try await saveJournalEntry(entry)
+            }
+            
+            return entry
+        } catch {
+            logger.error("Fehler beim Speichern des Eintrags: \(error.localizedDescription)")
+            throw JournalError.saveError(error.localizedDescription)
+        }
+    }
+    
+    // Hilfsfunktion für Timeout
+    func withTimeout<T>(seconds: Double, operation: @escaping () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw NSError(domain: "TimeoutError", code: -1, userInfo: [NSLocalizedDescriptionKey: "Operation timeout"])
+            }
+            
+            for try await result in group {
+                group.cancelAll()
+                return result
+            }
+            
+            throw NSError(domain: "TimeoutError", code: -1, userInfo: [NSLocalizedDescriptionKey: "No result received"])
+        }
     }
     #endif
     
@@ -666,6 +811,7 @@ class JournalService {
         case fetchFailed(String)
         case syncFailed(String)
         case storageError(String)
+        case resourceExhausted
         
         var errorDescription: String? {
             switch self {
@@ -675,6 +821,8 @@ class JournalService {
                  .syncFailed(let message),
                  .storageError(let message):
                 return message
+            case .resourceExhausted:
+                return "Resource exhausted"
             }
         }
     }

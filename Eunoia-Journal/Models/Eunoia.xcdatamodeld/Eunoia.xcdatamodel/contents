@@ -21,6 +21,11 @@
         <attribute name="learningNuggetContent" optional="YES" attributeType="String"/>
         <attribute name="syncStatus" optional="YES" attributeType="String"/>
         <attribute name="userId" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="content" optional="YES" attributeType="String"/>
+        <attribute name="location" optional="YES" attributeType="String"/>
+        <attribute name="imageURLs" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="localImagePaths" optional="YES" attributeType="Transformable" customClassName="[String]"/>
     </entity>
     <entity name="PersonalValueEntity" representedClassName="PersonalValueEntity" syncable="YES" codeGenerationType="class">
         <attribute name="id" optional="YES" attributeType="String"/>

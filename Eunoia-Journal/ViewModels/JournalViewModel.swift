@@ -6,6 +6,8 @@ import Combine
 import FirebaseAuth
 import OSLog
 import UIKit
+import CoreData
+import SwiftUI
 
 @available(iOS 17.0, *)
 class JournalViewModel: ObservableObject {
@@ -15,6 +17,7 @@ class JournalViewModel: ObservableObject {
     @Published var currentEntry: JournalEntry?
     @Published var aiSuggestions: [String] = []
     @Published var learningNugget: LearningNugget?
+    @Published var currentLearningText: String = ""
     
     private let firebaseService = FirebaseService.shared
     private let coreDataManager = CoreDataManager.shared
@@ -68,11 +71,18 @@ class JournalViewModel: ObservableObject {
             .store(in: &cancellables)
             
         // Subscribe to network status changes
-        NetworkMonitor.shared.$isConnected
+        NetworkMonitor.shared.objectWillChange
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] isConnected in
-                if isConnected {
-                    self?.syncPendingEntries()
+            .sink { [weak self] _ in
+                if NetworkMonitor.shared.isConnected {
+                    Task {
+                        do {
+                            try await self?.syncPendingEntries()
+                        } catch {
+                            self?.logger.error("Failed to sync pending entries: \(error.localizedDescription)")
+                            self?.error = error
+                        }
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -88,9 +98,19 @@ class JournalViewModel: ObservableObject {
                existingEntry.syncStatus == .pendingUpload {
                 var updatedEntry = entry
                 updatedEntry.syncStatus = .pendingUpload
-                coreDataManager.saveJournalEntry(updatedEntry)
+                do {
+                    try coreDataManager.saveJournalEntry(updatedEntry)
+                } catch {
+                    logger.error("Error saving updated entry: \(error)")
+                    self.error = error
+                }
             } else {
-                coreDataManager.saveJournalEntry(entry)
+                do {
+                    try coreDataManager.saveJournalEntry(entry)
+                } catch {
+                    logger.error("Error saving new entry: \(error)")
+                    self.error = error
+                }
             }
         }
         
@@ -100,67 +120,173 @@ class JournalViewModel: ObservableObject {
         }
     }
     
-    private func syncPendingEntries() {
+    private func syncPendingEntries() async throws {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
-        // Get entries that need syncing
-        let pendingEntries = coreDataManager.fetchPendingEntries(for: userId)
+        let pendingEntries = try coreDataManager.fetchPendingEntries(for: userId)
         
         for entry in pendingEntries {
-            Task {
-                do {
-                    try await firebaseService.saveJournalEntry(entry)
-                    
-                    DispatchQueue.main.async {
-                        // Update local entry status
-                        if let index = self.journalEntries.firstIndex(where: { $0.id == entry.id }) {
-                            var updatedEntry = entry
-                            updatedEntry.syncStatus = .synced
-                            self.journalEntries[index] = updatedEntry
-                            self.coreDataManager.saveJournalEntry(updatedEntry)
-                        }
-                    }
-                } catch {
-                    print("Failed to sync entry: \(error.localizedDescription)")
-                    // Schedule retry after delay
-                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                    try? await firebaseService.saveJournalEntry(entry)
+            do {
+                try await firebaseService.saveJournalEntry(entry)
+                
+                // Update local entry status
+                if let index = self.journalEntries.firstIndex(where: { $0.id == entry.id }) {
+                    var updatedEntry = entry
+                    updatedEntry.syncStatus = .synced
+                    self.journalEntries[index] = updatedEntry
+                    try await coreDataManager.saveJournalEntry(updatedEntry)
                 }
+            } catch {
+                print("Error syncing entry with Firebase: \(error)")
+                throw error
             }
+        }
+    }
+    
+    private func saveEntryLocally(_ entry: JournalEntry) throws {
+        do {
+            try coreDataManager.saveJournalEntry(entry)
+            
+            // Aktualisiere den currentEntry und UI sofort
+            DispatchQueue.main.async {
+                self.currentEntry = entry
+                
+                // Aktualisiere den Eintrag in der journalEntries Liste
+                if let index = self.journalEntries.firstIndex(where: { $0.id == entry.id }) {
+                    self.journalEntries[index] = entry
+                }
+                
+                // Benachrichtige UI über Änderungen
+                self.objectWillChange.send()
+            }
+        } catch {
+            print("Error saving entry locally: \(error)")
+            throw error
         }
     }
     
     func loadJournalEntries() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
-        isLoading = true
-        
-        // First load from Core Data
-        let localEntries = coreDataManager.fetchJournalEntries(for: userId)
-        DispatchQueue.main.async {
-            self.journalEntries = localEntries.sorted(by: { $0.date > $1.date })
+        guard let userId = Auth.auth().currentUser?.uid else {
+            self.error = ServiceError.userNotAuthenticated
+            return
         }
         
-        // Then fetch from Firebase if online
-        if NetworkMonitor.shared.isConnected {
-            Task {
+        isLoading = true
+        
+        Task {
+            do {
+                // Lade zuerst lokale Einträge mit verbesserter Fehlerbehandlung
+                let localEntries: [JournalEntry]
                 do {
-                    let entries = try await firebaseService.fetchJournalEntries(for: userId)
-                    DispatchQueue.main.async {
-                        self.handleNewEntries(entries)
-                        self.isLoading = false
+                    localEntries = try coreDataManager.fetchJournalEntries(for: userId)
+                    await MainActor.run {
+                        self.journalEntries = localEntries.sorted(by: { $0.date > $1.date })
                     }
                 } catch {
-                    DispatchQueue.main.async {
-                        self.error = error
-                        self.isLoading = false
+                    logger.error("Fehler beim Laden lokaler Einträge: \(error.localizedDescription)")
+                    throw error
+                }
+                
+                // Wenn online, synchronisiere mit Firebase
+                if NetworkMonitor.shared.isConnected {
+                    do {
+                        // Implementiere Retry-Logik für Firebase-Synchronisation
+                        let maxRetries = 3
+                        var retryCount = 0
+                        var lastError: Error?
+                        
+                        while retryCount < maxRetries {
+                            do {
+                                let firebaseEntries = try await firebaseService.fetchJournalEntries(for: userId)
+                                
+                                // Merge Einträge mit Konfliktauflösung
+                                let mergedEntries = try await mergeEntries(local: localEntries, remote: firebaseEntries)
+                                
+                                // Speichere merged Einträge in Core Data
+                                for entry in mergedEntries {
+                                    try await Task.sleep(nanoseconds: 100_000_000) // 0.1s Pause zwischen Speicheroperationen
+                                    try coreDataManager.saveJournalEntry(entry)
+                                }
+                                
+                                await MainActor.run {
+                                    self.journalEntries = mergedEntries.sorted(by: { $0.date > $1.date })
+                                    self.error = nil
+                                }
+                                break // Erfolgreicher Sync, breche Retry-Schleife ab
+                                
+                            } catch {
+                                lastError = error
+                                retryCount += 1
+                                if retryCount < maxRetries {
+                                    try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(retryCount)) * 1_000_000_000))
+                                    continue
+                                }
+                                throw error
+                            }
+                        }
+                        
+                        if let error = lastError {
+                            logger.error("Fehler beim Synchronisieren mit Firebase nach \(maxRetries) Versuchen: \(error.localizedDescription)")
+                            throw error
+                        }
+                        
+                    } catch {
+                        await MainActor.run {
+                            self.error = error
+                            self.logger.error("Fehler beim Synchronisieren mit Firebase: \(error.localizedDescription)")
+                        }
                     }
                 }
+            } catch {
+                await MainActor.run {
+                    self.error = error
+                    self.logger.error("Fehler beim Laden der Einträge: \(error.localizedDescription)")
+                }
             }
-        } else {
-            isLoading = false
+            
+            await MainActor.run {
+                self.isLoading = false
+            }
         }
     }
     
+    private func mergeEntries(local: [JournalEntry], remote: [JournalEntry]) async throws -> [JournalEntry] {
+        var mergedEntries: [JournalEntry] = []
+        var processedIds = Set<String>()
+        
+        // Verarbeite lokale Einträge
+        for localEntry in local {
+            guard let id = localEntry.id else { continue }
+            
+            if let remoteEntry = remote.first(where: { $0.id == id }) {
+                // Konfliktauflösung basierend auf Zeitstempel
+                if let localTimestamp = localEntry.serverTimestamp?.dateValue(),
+                   let remoteTimestamp = remoteEntry.serverTimestamp?.dateValue() {
+                    mergedEntries.append(localTimestamp > remoteTimestamp ? localEntry : remoteEntry)
+                } else {
+                    // Wenn keine Zeitstempel verfügbar, bevorzuge Remote
+                    mergedEntries.append(remoteEntry)
+                }
+            } else {
+                // Lokaler Eintrag existiert nicht remote
+                if localEntry.syncStatus == .pendingUpload {
+                    mergedEntries.append(localEntry)
+                }
+            }
+            processedIds.insert(id)
+        }
+        
+        // Füge neue Remote-Einträge hinzu
+        for remoteEntry in remote {
+            if let id = remoteEntry.id, !processedIds.contains(id) {
+                mergedEntries.append(remoteEntry)
+            }
+        }
+        
+        return mergedEntries
+    }
+    
+    @MainActor
     func createNewEntry() {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
@@ -177,67 +303,82 @@ class JournalViewModel: ObservableObject {
         )
         
         currentEntry = newEntry
+        currentLearningText = ""
     }
     
     func saveEntry(_ entry: JournalEntry) {
         var entryToSave = entry
         
+        // Wenn ein Learning vorhanden ist, aber kein LearningNugget, erstellen wir eines
+        if !entry.learning.isEmpty && entry.learningNugget == nil {
+            let nugget = LearningNugget(
+                userId: entry.userId,
+                category: .persönlichesWachstum,
+                title: "Lernimpuls",
+                content: entry.learning,
+                isAddedToJournal: true
+            )
+            entryToSave.learningNugget = nugget
+        }
+        
         // Set sync status based on network availability
         entryToSave.syncStatus = NetworkMonitor.shared.isConnected ? .synced : .pendingUpload
         
         // Save to Core Data first
-        coreDataManager.saveJournalEntry(entryToSave)
-        
-        // Update local array immediately
-        DispatchQueue.main.async {
-            if let index = self.journalEntries.firstIndex(where: { $0.id == entryToSave.id }) {
-                self.journalEntries[index] = entryToSave
-            } else {
-                self.journalEntries.insert(entryToSave, at: 0)
+        do {
+            try coreDataManager.saveJournalEntry(entryToSave)
+            
+            // Update local array immediately
+            DispatchQueue.main.async {
+                if let index = self.journalEntries.firstIndex(where: { $0.id == entryToSave.id }) {
+                    self.journalEntries[index] = entryToSave
+                } else {
+                    self.journalEntries.insert(entryToSave, at: 0)
+                }
             }
-        }
-        
-        // If online, sync with Firebase
-        if NetworkMonitor.shared.isConnected {
-            Task {
-                do {
-                    try await firebaseService.saveJournalEntry(entryToSave)
-                } catch {
-                    DispatchQueue.main.async {
-                        self.error = error
-                        // Mark for retry and update UI
-                        entryToSave.syncStatus = .pendingUpload
-                        self.coreDataManager.saveJournalEntry(entryToSave)
-                        if let index = self.journalEntries.firstIndex(where: { $0.id == entryToSave.id }) {
-                            self.journalEntries[index] = entryToSave
-                        }
-                    }
-                    
-                    // Schedule retry after delay
-                    try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
-                    if entryToSave.syncStatus == .pendingUpload {
-                        try? await firebaseService.saveJournalEntry(entryToSave)
+            
+            // If online, sync with Firebase
+            if NetworkMonitor.shared.isConnected {
+                Task {
+                    do {
+                        try await firebaseService.saveJournalEntry(entryToSave)
+                    } catch {
+                        print("Error saving entry to Firebase: \(error)")
                     }
                 }
             }
+        } catch {
+            print("Error saving entry to CoreData: \(error)")
         }
     }
     
     func deleteEntry(_ entry: JournalEntry) {
-        // Remove from local array
-        journalEntries.removeAll { $0.id == entry.id }
+        guard let id = entry.id else { return }
         
-        // Delete from Firebase if online
-        if NetworkMonitor.shared.isConnected {
-            Task {
-                do {
-                    if let id = entry.id {
+        Task {
+            do {
+                // Lösche zuerst aus Core Data
+                try await coreDataManager.deleteJournalEntryAsync(withId: id)
+                
+                // Aktualisiere die UI im Hauptthread
+                await MainActor.run {
+                    journalEntries.removeAll { $0.id == id }
+                }
+                
+                // Wenn online, lösche auch aus Firebase
+                if NetworkMonitor.shared.isConnected {
+                    do {
                         try await firebaseService.deleteJournalEntry(withId: id)
+                    } catch {
+                        // Logge den Firebase-Fehler, aber wirf ihn nicht
+                        logger.error("Fehler beim Löschen in Firebase: \(error.localizedDescription)")
                     }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.error = error
-                    }
+                }
+            } catch {
+                // Fehlerbehandlung im Hauptthread
+                await MainActor.run {
+                    self.error = error
+                    self.logger.error("Fehler beim lokalen Löschen: \(error.localizedDescription)")
                 }
             }
         }
@@ -256,15 +397,22 @@ class JournalViewModel: ObservableObject {
     }
     
     func generateLearningNugget(for category: LearningNugget.Category) {
+        isLoading = true
+        
         Task {
             do {
                 let nugget = try await learningNuggetService.generateLearningNugget(for: category)
-                DispatchQueue.main.async {
+                await MainActor.run {
                     self.learningNugget = nugget
+                    self.isLoading = false
+                    // Automatisch das Nugget zum Eintrag hinzufügen
+                    self.addLearningNuggetToEntry()
                 }
             } catch {
-                DispatchQueue.main.async {
+                await MainActor.run {
                     self.error = error
+                    self.isLoading = false
+                    self.logger.error("Fehler bei der Generierung des Learning Nuggets: \(error.localizedDescription)")
                 }
             }
         }
@@ -272,8 +420,55 @@ class JournalViewModel: ObservableObject {
     
     func addLearningNuggetToEntry() {
         guard var entry = currentEntry, let nugget = learningNugget else { return }
-        entry.learningNugget = nugget
-        currentEntry = entry
+        
+        // Aktualisiere den Eintrag mit dem Learning Nugget und füge den Content zum Lernfeld hinzu
+        entry = JournalEntry(
+            id: entry.id,
+            userId: entry.userId,
+            date: entry.date,
+            gratitude: entry.gratitude,
+            highlight: entry.highlight,
+            learning: nugget.content,
+            learningNugget: nugget,
+            lastModified: Date(),
+            syncStatus: .pendingUpload,
+            title: entry.title,
+            content: entry.content,
+            location: entry.location,
+            imageURLs: entry.imageURLs,
+            localImagePaths: entry.localImagePaths
+        )
+        
+        // Aktualisiere den currentEntry und UI sofort
+        DispatchQueue.main.async {
+            self.currentEntry = entry
+            
+            // Aktualisiere den Eintrag in der journalEntries Liste
+            if let index = self.journalEntries.firstIndex(where: { $0.id == entry.id }) {
+                self.journalEntries[index] = entry
+            }
+            
+            // Benachrichtige UI über Änderungen
+            self.objectWillChange.send()
+        }
+        
+        // Speichere in CoreData
+        do {
+            try coreDataManager.saveJournalEntry(entry)
+            
+            // Speichere in Firebase
+            Task {
+                do {
+                    try await journalService.saveJournalEntry(entry)
+                } catch {
+                    self.logger.error("Error saving entry to Firebase: \(error)")
+                    self.error = error
+                }
+            }
+        } catch {
+            self.logger.error("Error saving entry to CoreData: \(error)")
+            self.error = error
+        }
     }
     
     // MARK: - Search and Filtering
@@ -393,4 +588,92 @@ class JournalViewModel: ObservableObject {
     func updateEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
         return try await saveEntryWithImages(entry, images: images)
     }
-} 
+    
+    func updateCurrentEntry(with nugget: LearningNugget) {
+        guard var entry = currentEntry else { return }
+        
+        entry.learningNugget = nugget
+        entry.learning = nugget.content
+        entry.lastModified = Date()
+        entry.syncStatus = .pendingUpload
+        
+        currentEntry = entry
+        currentLearningText = nugget.content
+        
+        // Speichere den aktualisierten Eintrag
+        saveEntry(entry)
+    }
+    
+    func processOpenAIResponse(_ jsonResponse: String) async {
+        logger.debug("Empfangene OpenAI-Antwort: \(jsonResponse)")
+        
+        guard let data = jsonResponse.data(using: .utf8) else {
+            logger.error("Fehler: Konnte JSON-String nicht in Data konvertieren")
+            await MainActor.run {
+                self.error = NSError(domain: "OpenAIProcessing", code: -1, userInfo: [NSLocalizedDescriptionKey: "Ungültiges Antwortformat"])
+            }
+            return
+        }
+        
+        do {
+            logger.debug("Versuche JSON zu decodieren...")
+            let response = try JSONDecoder().decode(OpenAIResponse.self, from: data)
+            logger.debug("JSON erfolgreich decodiert. Erste Choice verfügbar: \(response.choices.first != nil)")
+            
+            if let (title, content) = response.extractLearningContent() {
+                logger.debug("Learning Content erfolgreich extrahiert:")
+                logger.debug("Titel: \(title)")
+                logger.debug("Content: \(content)")
+                
+                await MainActor.run {
+                    if let userId = self.currentEntry?.userId {
+                        let learningNugget = LearningNugget(
+                            userId: userId,
+                            category: .persönlichesWachstum,
+                            title: title,
+                            content: content,
+                            isAddedToJournal: true
+                        )
+                        
+                        self.learningNugget = learningNugget
+                        self.currentLearningText = content
+                        self.updateCurrentEntry(with: learningNugget)
+                        self.error = nil
+                    } else {
+                        self.error = NSError(domain: "OpenAIProcessing", code: -2, userInfo: [NSLocalizedDescriptionKey: "Kein aktiver Eintrag vorhanden"])
+                    }
+                }
+            } else {
+                logger.error("Konnte Learning Content nicht aus der Antwort extrahieren")
+                await MainActor.run {
+                    self.error = NSError(domain: "OpenAIProcessing", code: -3, userInfo: [NSLocalizedDescriptionKey: "Konnte Lerninhalte nicht aus der Antwort extrahieren"])
+                }
+            }
+        } catch {
+            logger.error("Fehler beim Decodieren der OpenAI-Antwort: \(error.localizedDescription)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    logger.error("Fehlender Schlüssel: \(key.stringValue) in \(context.codingPath)")
+                case .typeMismatch(let type, let context):
+                    logger.error("Typfehler: Erwarteter Typ \(type) in \(context.codingPath)")
+                case .valueNotFound(let type, let context):
+                    logger.error("Fehlender Wert: Typ \(type) in \(context.codingPath)")
+                @unknown default:
+                    logger.error("Unbekannter Decodierungsfehler")
+                }
+            }
+            
+            await MainActor.run {
+                self.error = error
+                // Debug-Logging der Rohdaten
+                if let stringRepresentation = String(data: data, encoding: .utf8) {
+                    logger.debug("Rohdaten der fehlgeschlagenen Antwort: \(stringRepresentation)")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - OpenAI Response Handling
+// Die OpenAIResponse Struktur wurde in Models/OpenAIResponse.swift verschoben 

@@ -13,6 +13,10 @@ struct JournalListView: View {
     @State private var selectedDate = Date()
     @State private var showingSuggestionsPicker = false
     @State private var selectedImages: [UIImage] = []
+    @State private var isProcessingSuggestion = false
+    @State private var dismissInProgress = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
     
     private var filteredEntries: [JournalEntry] {
         if searchText.isEmpty {
@@ -22,65 +26,121 @@ struct JournalListView: View {
         }
     }
     
-    var body: some View {
-        ZStack {
-            // Background
-            Color(.systemBackground)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Streak Banner
-                StreakBannerView(streak: viewModel.calculateCurrentStreak())
-                
-                // Search and Filter
-                SearchBar(text: $searchText)
-                    .padding()
-                
-                // Journal Entries List
-                if filteredEntries.isEmpty {
-                    EmptyStateView()
-                } else {
-                    List {
-                        ForEach(filteredEntries) { entry in
-                            JournalEntryRow(entry: entry)
-                                .onTapGesture {
-                                    selectedEntry = entry
-                                }
-                        }
+    #if canImport(JournalingSuggestions)
+    private var suggestionPickerSheet: some View {
+        if #available(iOS 17.2, *) {
+            return NavigationView {
+                VStack {
+                    JournalingSuggestionsPicker(label: {
+                        Text("Vorschläge")
+                    }, onCompletion: { suggestion in
+                        handleSuggestionSelection(suggestion)
+                    })
+                    
+                    if selectedImages.count < 5 {
+                        ImagePickerButton(
+                            selectedImages: $selectedImages,
+                            maxImages: 5
+                        )
+                        .padding()
+                        .disabled(isProcessingSuggestion)
                     }
-                    .listStyle(InsetGroupedListStyle())
-                    .background(Color(.systemBackground))
+                }
+            }
+        } else {
+            return EmptyView()
+        }
+    }
+    
+    private func handleSuggestionSelection(_ suggestion: JournalingSuggestion) {
+        guard !isProcessingSuggestion && !dismissInProgress else { return }
+        
+        isProcessingSuggestion = true
+        dismissInProgress = true
+        
+        Task {
+            do {
+                let entry = try await viewModel.createEntryFromSuggestion(suggestion)
+                if !selectedImages.isEmpty {
+                    _ = try await viewModel.saveEntryWithImages(entry, images: selectedImages)
+                }
+                await MainActor.run {
+                    selectedImages = []
+                    isProcessingSuggestion = false
+                    showingSuggestionsPicker = false
+                    dismissInProgress = false
+                }
+            } catch {
+                print("Fehler beim Erstellen des Eintrags: \(error)")
+                await MainActor.run {
+                    selectedImages = []
+                    isProcessingSuggestion = false
+                    dismissInProgress = false
+                }
+            }
+        }
+    }
+    #endif
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 16) {
+                Button(action: { showingDatePicker.toggle() }) {
+                    Image(systemName: "calendar")
+                        .foregroundColor(.primary)
+                        .frame(width: 44, height: 44)
+                }
+                
+                Spacer()
+                
+                Button(action: { showingSuggestionsPicker.toggle() }) {
+                    Image(systemName: "lightbulb")
+                        .foregroundColor(.primary)
+                        .frame(width: 44, height: 44)
+                }
+                
+                Button(action: { showingNewEntry.toggle() }) {
+                    Image(systemName: "square.and.pencil")
+                        .foregroundColor(.primary)
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .padding(.horizontal)
+            .background(Color(.systemBackground))
+            
+            // Content
+            ZStack {
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Streak Banner
+                    StreakBannerView(streak: viewModel.calculateCurrentStreak())
+                    
+                    // Search and Filter
+                    SearchBar(text: $searchText)
+                        .padding()
+                    
+                    // Journal Entries List
+                    if filteredEntries.isEmpty {
+                        EmptyStateView()
+                    } else {
+                        List {
+                            ForEach(filteredEntries) { entry in
+                                JournalEntryRow(entry: entry)
+                                    .onTapGesture {
+                                        selectedEntry = entry
+                                    }
+                            }
+                        }
+                        .listStyle(InsetGroupedListStyle())
+                        .background(Color(.systemBackground))
+                    }
                 }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    showingDatePicker.toggle()
-                }) {
-                    Image(systemName: "calendar")
-                }
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showingNewEntry.toggle()
-                }) {
-                    Image(systemName: "square.and.pencil")
-                }
-            }
-            #if canImport(JournalingSuggestions)
-            if #available(iOS 17.2, *) {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showingSuggestionsPicker = true
-                    }) {
-                        Image(systemName: "lightbulb")
-                    }
-                }
-            }
-            #endif
-        }
         .sheet(isPresented: $showingNewEntry) {
             NavigationView {
                 JournalEntryView(viewModel: viewModel)
@@ -102,55 +162,33 @@ struct JournalListView: View {
         #if canImport(JournalingSuggestions)
         .sheet(isPresented: $showingSuggestionsPicker) {
             if #available(iOS 17.2, *) {
-                NavigationView {
-                    VStack {
-                        JournalingSuggestionsPicker(label: {
-                            Text("Vorschläge")
-                        }, onCompletion: { suggestion in
-                            Task {
-                                do {
-                                    let entry = try await viewModel.createEntryFromSuggestion(suggestion)
-                                    if !selectedImages.isEmpty {
-                                        _ = try await viewModel.saveEntryWithImages(entry, images: selectedImages)
-                                    }
-                                    await MainActor.run {
-                                        selectedImages = []
-                                        showingSuggestionsPicker = false
-                                    }
-                                } catch {
-                                    print("Fehler beim Erstellen des Eintrags: \(error)")
-                                    await MainActor.run {
-                                        selectedImages = []
-                                        showingSuggestionsPicker = false
-                                    }
-                                }
-                            }
-                        })
-                        
-                        if selectedImages.count < 5 {
-                            ImagePickerButton(
-                                selectedImages: $selectedImages,
-                                maxImages: 5
-                            )
-                            .padding()
-                        }
-                        
-                        if !selectedImages.isEmpty {
-                            ImageGalleryView(images: selectedImages) { index in
-                                selectedImages.remove(at: index)
-                            }
-                            .frame(height: 120)
-                            .padding(.horizontal)
-                        }
-                    }
-                    .navigationTitle("Vorschläge")
-                    .navigationBarItems(trailing: Button("Fertig") {
-                        showingSuggestionsPicker = false
-                    })
-                }
+                suggestionPickerSheet
             }
         }
         #endif
+        .alert("Fehler", isPresented: $showingError) {
+            Button("OK", role: .cancel) {
+                showingError = false
+                viewModel.error = nil
+            }
+        } message: {
+            Text(errorMessage)
+        }
+        .onChange(of: viewModel.error != nil) { hasError in
+            if hasError {
+                Task { @MainActor in
+                    errorMessage = viewModel.error?.localizedDescription ?? "Unbekannter Fehler"
+                    showingError = true
+                }
+            }
+        }
+    }
+    
+    private func handleError(_ error: Error) {
+        Task { @MainActor in
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
     }
 }
 
@@ -340,13 +378,18 @@ struct DatePickerView: View {
     
     var body: some View {
         NavigationView {
-            DatePicker(
-                LocalizedStringKey("Datum auswählen"),
-                selection: $selectedDate,
-                displayedComponents: .date
-            )
-            .datePickerStyle(GraphicalDatePickerStyle())
-            .padding()
+            VStack {
+                DatePicker(
+                    LocalizedStringKey("Datum auswählen"),
+                    selection: $selectedDate,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(GraphicalDatePickerStyle())
+                .padding()
+                .frame(maxHeight: 400)
+                
+                Spacer()
+            }
             .navigationTitle(LocalizedStringKey("Datum auswählen"))
             .navigationBarItems(
                 trailing: Button(LocalizedStringKey("Fertig")) {

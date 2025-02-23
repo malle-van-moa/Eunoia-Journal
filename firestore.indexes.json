@@ -1,8 +1,8 @@
 {
   "indexes": [
     {
-      "collectionId": "journalEntries",
-      "queryScope": "COLLECTION",
+      "collectionGroup": "journalEntries",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "userId",
@@ -15,15 +15,15 @@
       ]
     },
     {
-      "collectionId": "learningNuggets",
+      "collectionGroup": "learningNuggets",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "userId",
+          "fieldPath": "category",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "category",
+          "fieldPath": "userId",
           "order": "ASCENDING"
         },
         {
@@ -31,7 +31,29 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "learningNuggets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "category",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
-} 
+}

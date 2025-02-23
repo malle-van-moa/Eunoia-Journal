@@ -8,7 +8,7 @@ import Foundation
 import FirebaseCore
 import FirebaseFirestore
 
-struct JournalEntry: Identifiable, Codable {
+struct JournalEntry: Identifiable, Codable, Equatable {
     let id: String?
     let userId: String
     let date: Date
@@ -153,18 +153,22 @@ struct JournalEntry: Identifiable, Codable {
         self.imageURLs = imageURLs
         self.localImagePaths = localImagePaths
     }
-}
-
-struct LearningNugget: Codable {
-    var category: Category
-    var content: String
-    var isAddedToJournal: Bool
     
-    enum Category: String, Codable, CaseIterable {
-        case nature
-        case science
-        case psychology
-        case history
+    static func == (lhs: JournalEntry, rhs: JournalEntry) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.userId == rhs.userId &&
+        lhs.date == rhs.date &&
+        lhs.gratitude == rhs.gratitude &&
+        lhs.highlight == rhs.highlight &&
+        lhs.learning == rhs.learning &&
+        lhs.lastModified == rhs.lastModified &&
+        lhs.syncStatus == rhs.syncStatus &&
+        lhs.title == rhs.title &&
+        lhs.content == rhs.content &&
+        lhs.location == rhs.location &&
+        lhs.imageURLs == rhs.imageURLs &&
+        lhs.localImagePaths == rhs.localImagePaths &&
+        lhs.learningNugget == rhs.learningNugget
     }
 }
 

@@ -1,5 +1,5 @@
 import Foundation
 
 enum APIKeys {
-    static let openAIKey = "sk-rrqGGIEVmCC7aKEXoEwi7hRA0wHYaK_UMJEOwKBGy4T3BlbkFJoQyB9e0ZWGbML2jOtxQP-wQW3gtZS8Wr6hp7HrrWYA"
+    static let openAIKey = "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"
 } 

@@ -7,6 +7,22 @@ struct MainTabView: View {
     @State private var selectedTab = 1
     @State private var showingDashboard = true
     
+    private var toolbarTitle: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "house.fill")
+                .imageScale(.large)
+                .foregroundStyle(.purple)
+            Text("Eunoia")
+                .font(.headline)
+                .fontWeight(.bold)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(.systemBackground))
+        .cornerRadius(10)
+        .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+    }
+    
     var body: some View {
         TabView(selection: $selectedTab) {
             // Journal/Dashboard Tab
@@ -24,18 +40,7 @@ struct MainTabView: View {
                                             showingDashboard = true
                                         }
                                     } label: {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "house.fill")
-                                                .imageScale(.large)
-                                                .foregroundStyle(.purple)
-                                            Text("Eunoia")
-                                                .font(.headline)
-                                                .fontWeight(.bold)
-                                        }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(Color(.systemBackground))
-                                        .cornerRadius(8)
+                                        toolbarTitle
                                     }
                                 }
                             }
@@ -63,18 +68,7 @@ struct MainTabView: View {
                                             showingDashboard = true
                                         }
                                     } label: {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "house.fill")
-                                                .imageScale(.large)
-                                                .foregroundStyle(.purple)
-                                            Text("Eunoia")
-                                                .font(.headline)
-                                                .fontWeight(.bold)
-                                        }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(Color(.systemBackground))
-                                        .cornerRadius(8)
+                                        toolbarTitle
                                     }
                                 }
                             }
@@ -99,18 +93,7 @@ struct MainTabView: View {
                                     showingDashboard = true
                                 }
                             } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "house.fill")
-                                        .imageScale(.large)
-                                        .foregroundStyle(.purple)
-                                    Text("Eunoia")
-                                        .font(.headline)
-                                        .fontWeight(.bold)
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color(.systemBackground))
-                                .cornerRadius(8)
+                                toolbarTitle
                             }
                         }
                     }

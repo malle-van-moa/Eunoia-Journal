@@ -9,6 +9,10 @@ import CryptoKit
 class AuthenticationService {
     static let shared = AuthenticationService()
     
+    var currentUser: User? {
+        Auth.auth().currentUser
+    }
+    
     private init() {}
     
     // MARK: - Authentication Methods

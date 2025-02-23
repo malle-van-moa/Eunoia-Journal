@@ -1,6 +1,26 @@
 import CoreData
 import Foundation
 
+enum CoreDataError: LocalizedError {
+    case fetchError(String)
+    case saveError(String)
+    case conversionError(String)
+    case entityNotFound
+    
+    var errorDescription: String? {
+        switch self {
+        case .fetchError(let message):
+            return "Fehler beim Abrufen der Daten: \(message)"
+        case .saveError(let message):
+            return "Fehler beim Speichern: \(message)"
+        case .conversionError(let message):
+            return "Fehler bei der Datenkonvertierung: \(message)"
+        case .entityNotFound:
+            return "Eintrag wurde nicht gefunden"
+        }
+    }
+}
+
 class CoreDataManager {
     static let shared = CoreDataManager()
     
@@ -15,19 +35,23 @@ class CoreDataManager {
             }
         }
         context = persistentContainer.viewContext
+        
+        // Aktiviere automatisches Merging von Änderungen
+        context.automaticallyMergesChangesFromParent = true
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
     
-    func saveContext() {
+    func saveContext() throws {
         if context.hasChanges {
             do {
                 try context.save()
             } catch {
-                print("Error saving context: \(error)")
+                throw CoreDataError.saveError(error.localizedDescription)
             }
         }
     }
     
-    func fetchJournalEntries(for userId: String) -> [JournalEntry] {
+    func fetchJournalEntries(for userId: String) throws -> [JournalEntry] {
         let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
         request.predicate = NSPredicate(format: "userId == %@", userId)
         request.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntryEntity.date, ascending: false)]
@@ -36,15 +60,11 @@ class CoreDataManager {
             let entities = try context.fetch(request)
             return entities.map { JournalEntry(from: $0) }
         } catch {
-            // Only log real errors, not empty results
-            if error.localizedDescription != "nilError" {
-                print("Error fetching entries: \(error)")
-            }
-            return []
+            throw CoreDataError.fetchError(error.localizedDescription)
         }
     }
     
-    func fetchPendingEntries(for userId: String) -> [JournalEntry] {
+    func fetchPendingEntries(for userId: String) throws -> [JournalEntry] {
         let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
         request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             NSPredicate(format: "userId == %@", userId),
@@ -53,78 +73,127 @@ class CoreDataManager {
         
         do {
             let entities = try context.fetch(request)
-            return entities.compactMap { entity -> JournalEntry? in
+            return try entities.compactMap { entity -> JournalEntry? in
                 do {
                     return JournalEntry(from: entity)
                 } catch {
-                    print("Fehler beim Konvertieren des Eintrags: \(error.localizedDescription)")
-                    return nil
+                    throw CoreDataError.conversionError(error.localizedDescription)
                 }
             }
         } catch {
-            print("Fehler beim Abrufen ausstehender Einträge: \(error.localizedDescription)")
-            return []
+            throw CoreDataError.fetchError(error.localizedDescription)
         }
     }
     
-    func saveJournalEntry(_ entry: JournalEntry) {
+    func saveJournalEntry(_ entry: JournalEntry) throws {
         let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
         request.predicate = NSPredicate(format: "id == %@", entry.id ?? "")
         
-        do {
-            let results = try context.fetch(request)
-            let entity: JournalEntryEntity
-            
-            if let existingEntity = results.first {
-                // Update existing entity
-                entity = existingEntity
-            } else {
-                // Create new entity
-                entity = JournalEntryEntity(context: context)
-                entity.id = entry.id
+        var saveError: Error?
+        
+        context.performAndWait {
+            do {
+                let results = try context.fetch(request)
+                let entity: JournalEntryEntity
+                
+                if let existingEntity = results.first {
+                    // Update existing entity
+                    entity = existingEntity
+                } else {
+                    // Create new entity
+                    entity = JournalEntryEntity(context: context)
+                    entity.id = entry.id
+                }
+                
+                // Update properties in a transaction
+                context.transactionAuthor = "JournalEntry_Save"
+                context.name = "SaveJournalEntry"
+                
+                entity.userId = entry.userId
+                entity.date = entry.date
+                entity.gratitude = entry.gratitude
+                entity.highlight = entry.highlight
+                entity.learning = entry.learning
+                entity.lastModified = entry.lastModified
+                entity.syncStatus = entry.syncStatus.rawValue
+                entity.title = entry.title
+                entity.content = entry.content
+                entity.location = entry.location
+                entity.imageURLs = entry.imageURLs
+                entity.localImagePaths = entry.localImagePaths
+                
+                // Handle learning nugget
+                if let nugget = entry.learningNugget {
+                    entity.learningNuggetCategory = nugget.category.rawValue
+                    entity.learningNuggetContent = nugget.content
+                    entity.learningNuggetAddedToJournal = nugget.isAddedToJournal
+                } else {
+                    entity.learningNuggetCategory = nil
+                    entity.learningNuggetContent = nil
+                    entity.learningNuggetAddedToJournal = false
+                }
+                
+                // Versuche zu speichern
+                if context.hasChanges {
+                    do {
+                        try context.save()
+                    } catch {
+                        saveError = CoreDataError.saveError("Fehler beim Speichern in CoreData: \(error.localizedDescription)")
+                    }
+                }
+            } catch {
+                saveError = CoreDataError.saveError("Fehler beim Speichern: \(error.localizedDescription)")
             }
-            
-            // Update properties
-            entity.userId = entry.userId
-            entity.date = entry.date
-            entity.gratitude = entry.gratitude
-            entity.highlight = entry.highlight
-            entity.learning = entry.learning
-            entity.lastModified = entry.lastModified
-            entity.syncStatus = entry.syncStatus.rawValue
-            
-            // Handle learning nugget
-            if let nugget = entry.learningNugget {
-                entity.learningNuggetCategory = nugget.category.rawValue
-                entity.learningNuggetContent = nugget.content
-                entity.learningNuggetAddedToJournal = nugget.isAddedToJournal
-            } else {
-                entity.learningNuggetCategory = nil
-                entity.learningNuggetContent = nil
-                entity.learningNuggetAddedToJournal = false
-            }
-            
-            try context.save()
-        } catch {
-            // Only log real errors
-            if error.localizedDescription != "nilError" {
-                print("Error saving entry: \(error)")
-            }
+        }
+        
+        if let error = saveError {
+            throw error
         }
     }
     
-    func deleteJournalEntry(withId id: String) {
+    func deleteJournalEntry(withId id: String) throws {
         let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
         request.predicate = NSPredicate(format: "id == %@", id)
         
         do {
             let results = try context.fetch(request)
-            if let entity = results.first {
-                context.delete(entity)
-                try context.save()
+            guard let entity = results.first else {
+                throw CoreDataError.entityNotFound
             }
+            
+            context.delete(entity)
+            try context.save()
         } catch {
-            print("Error deleting entry: \(error)")
+            throw CoreDataError.saveError(error.localizedDescription)
+        }
+    }
+    
+    func deleteJournalEntryAsync(withId id: String) async throws {
+        return try await withCheckedThrowingContinuation { continuation in
+            context.perform {
+                do {
+                    // Prüfe ob der Eintrag existiert
+                    let fetchRequest = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+                    fetchRequest.predicate = NSPredicate(format: "id == %@", id)
+                    
+                    let results = try self.context.fetch(fetchRequest)
+                    
+                    if let entityToDelete = results.first {
+                        self.context.delete(entityToDelete)
+                        
+                        // Speichere den Kontext
+                        if self.context.hasChanges {
+                            try self.context.save()
+                        }
+                        continuation.resume()
+                    } else {
+                        // Eintrag existiert nicht mehr
+                        continuation.resume()
+                    }
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
     }
     
