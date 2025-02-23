@@ -10,22 +10,22 @@
         <relationship name="visionBoard" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="VisionBoardEntity" inverseName="goals" inverseEntity="VisionBoardEntity"/>
     </entity>
     <entity name="JournalEntryEntity" representedClassName="JournalEntryEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="content" optional="YES" attributeType="String"/>
         <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="gratitude" optional="YES" attributeType="String"/>
         <attribute name="highlight" optional="YES" attributeType="String"/>
         <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="imageURLs" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayTransformer" customClassName="NSArray"/>
         <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="learning" optional="YES" attributeType="String"/>
         <attribute name="learningNuggetAddedToJournal" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="learningNuggetCategory" optional="YES" attributeType="String"/>
         <attribute name="learningNuggetContent" optional="YES" attributeType="String"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="userId" optional="YES" attributeType="String"/>
-        <attribute name="title" optional="YES" attributeType="String"/>
-        <attribute name="content" optional="YES" attributeType="String"/>
+        <attribute name="localImagePaths" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayTransformer" customClassName="NSArray"/>
         <attribute name="location" optional="YES" attributeType="String"/>
-        <attribute name="imageURLs" optional="YES" attributeType="Transformable" customClassName="[String]"/>
-        <attribute name="localImagePaths" optional="YES" attributeType="Transformable" customClassName="[String]"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="userId" optional="YES" attributeType="String"/>
     </entity>
     <entity name="PersonalValueEntity" representedClassName="PersonalValueEntity" syncable="YES" codeGenerationType="class">
         <attribute name="id" optional="YES" attributeType="String"/>
@@ -43,14 +43,11 @@
         <attribute name="lifestyleLivingEnvironment" optional="YES" attributeType="String"/>
         <attribute name="lifestyleRelationships" optional="YES" attributeType="String"/>
         <attribute name="lifestyleWorkLife" optional="YES" attributeType="String"/>
-        <attribute name="personalityAreasOfGrowth" optional="YES" attributeType="String"/>
         <attribute name="personalityBehaviors" optional="YES" attributeType="String"/>
-        <attribute name="personalityCorePrinciples" optional="YES" attributeType="String"/>
         <attribute name="personalityGrowth" optional="YES" attributeType="String"/>
         <attribute name="personalityHabits" optional="YES" attributeType="String"/>
         <attribute name="personalityMindset" optional="YES" attributeType="String"/>
         <attribute name="personalitySkills" optional="YES" attributeType="String"/>
-        <attribute name="personalityStrengths" optional="YES" attributeType="String"/>
         <attribute name="personalityTraits" optional="YES" attributeType="String"/>
         <attribute name="syncStatus" optional="YES" attributeType="String"/>
         <attribute name="userId" optional="YES" attributeType="String"/>

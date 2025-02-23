@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>190076633593-frlkjgcru9ms64mrlqq8k95qns6bmnpj.apps.googleusercontent.com</string>
+	<string>190076633593-hpbjnev4ds23d7mqhva71pk849jpi562.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.190076633593-frlkjgcru9ms64mrlqq8k95qns6bmnpj</string>
+	<string>com.googleusercontent.apps.190076633593-hpbjnev4ds23d7mqhva71pk849jpi562</string>
 	<key>API_KEY</key>
 	<string>AIzaSyAGHhpKZhTTxybAv8_SKvEuzYKSffh1ZZg</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>de.Eunoia-Journal</string>
+	<string>com.alexandermalchow.Eunoia-Journal</string>
 	<key>PROJECT_ID</key>
 	<string>eunoia-journal</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:190076633593:ios:0ea4fe15c7337ca950bd28</string>
+	<string>1:190076633593:ios:040b87b1ef862c4550bd28</string>
 </dict>
 </plist>

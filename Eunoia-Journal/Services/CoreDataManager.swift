@@ -28,19 +28,53 @@ class CoreDataManager {
     private let context: NSManagedObjectContext
     
     private init() {
-        persistentContainer = NSPersistentContainer(name: "Eunoia_Journal")
+        // Register custom transformers
+        StringArrayTransformer.register()
+        
+        persistentContainer = NSPersistentContainer(name: "Eunoia")
+        
+        // Verbesserte Fehlerbehandlung beim Laden der Stores
         persistentContainer.loadPersistentStores { description, error in
             if let error = error {
-                print("Core Data failed to load: \(error.localizedDescription)")
+                print("❌ Core Data failed to load: \(error.localizedDescription)")
+                print("Detailed error: \(error)")
+                
+                // Versuche das Backup-Model zu laden
+                if let modelURL = Bundle.main.url(forResource: "CoreDataModel", withExtension: "momd") {
+                    do {
+                        let model = NSManagedObjectModel(contentsOf: modelURL)
+                        let container = NSPersistentContainer(name: "CoreDataModel", managedObjectModel: model!)
+                        container.loadPersistentStores { description, error in
+                            if let error = error {
+                                fatalError("Failed to load Core Data: \(error)")
+                            }
+                        }
+                    } catch {
+                        fatalError("Failed to load backup Core Data model: \(error)")
+                    }
+                }
+            } else {
+                print("✅ Core Data successfully loaded")
             }
         }
-        context = persistentContainer.viewContext
         
-        // Aktiviere automatisches Merging von Änderungen
+        context = persistentContainer.viewContext
         context.automaticallyMergesChangesFromParent = true
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
     
+    // MARK: - Helper Methods
+    private func convertToNSArray(_ array: [String]?) -> NSArray? {
+        guard let array = array else { return nil }
+        return NSArray(array: array)
+    }
+    
+    private func convertFromNSArray(_ nsArray: NSArray?) -> [String]? {
+        guard let nsArray = nsArray else { return nil }
+        return nsArray as? [String]
+    }
+    
+    // MARK: - Core Methods
     func saveContext() throws {
         if context.hasChanges {
             do {
@@ -58,7 +92,30 @@ class CoreDataManager {
         
         do {
             let entities = try context.fetch(request)
-            return entities.map { JournalEntry(from: $0) }
+            return entities.map { entity -> JournalEntry in
+                JournalEntry(
+                    id: entity.id,
+                    userId: entity.userId ?? "",
+                    date: entity.date ?? Date(),
+                    gratitude: entity.gratitude ?? "",
+                    highlight: entity.highlight ?? "",
+                    learning: entity.learning ?? "",
+                    learningNugget: entity.learningNuggetCategory != nil ? LearningNugget(
+                        userId: entity.userId ?? "",
+                        category: LearningNugget.Category(rawValue: entity.learningNuggetCategory ?? "") ?? .persönlichesWachstum,
+                        title: "Lernimpuls",
+                        content: entity.learningNuggetContent ?? "",
+                        isAddedToJournal: entity.learningNuggetAddedToJournal
+                    ) : nil,
+                    lastModified: entity.lastModified ?? Date(),
+                    syncStatus: SyncStatus(rawValue: entity.syncStatus ?? "") ?? .pendingUpload,
+                    title: entity.title,
+                    content: entity.content,
+                    location: entity.location,
+                    imageURLs: convertFromNSArray(entity.imageURLs),
+                    localImagePaths: convertFromNSArray(entity.localImagePaths)
+                )
+            }
         } catch {
             throw CoreDataError.fetchError(error.localizedDescription)
         }
@@ -119,8 +176,8 @@ class CoreDataManager {
                 entity.title = entry.title
                 entity.content = entry.content
                 entity.location = entry.location
-                entity.imageURLs = entry.imageURLs
-                entity.localImagePaths = entry.localImagePaths
+                entity.imageURLs = convertToNSArray(entry.imageURLs)
+                entity.localImagePaths = convertToNSArray(entry.localImagePaths)
                 
                 // Handle learning nugget
                 if let nugget = entry.learningNugget {

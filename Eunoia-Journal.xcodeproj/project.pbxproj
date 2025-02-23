@@ -12,6 +12,7 @@
 		67510D752D4AA5C900A63CEC /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 67510D742D4AA5C900A63CEC /* FirebaseAuth */; };
 		67510D772D4AA5C900A63CEC /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 67510D762D4AA5C900A63CEC /* FirebaseFirestore */; };
 		67510D792D4AA5C900A63CEC /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 67510D782D4AA5C900A63CEC /* FirebaseStorage */; };
+		6780B8E22D6BAED800CD9EEF /* AdSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6780B8E12D6BAED800CD9EEF /* AdSupport.framework */; };
 		9DD0AA0DF7EBD4AA2473EA94 /* Pods_Eunoia_JournalUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1FAC8AAECAF8A813DD940B2A /* Pods_Eunoia_JournalUITests.framework */; };
 		B2C02DC050430691B2B28EC4 /* Pods_Eunoia_Journal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61F31860CA0EA812C9786026 /* Pods_Eunoia_Journal.framework */; };
 /* End PBXBuildFile section */
@@ -43,6 +44,7 @@
 		67510D422D4AA03700A63CEC /* Eunoia-Journal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Eunoia-Journal.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67510D522D4AA03900A63CEC /* Eunoia-JournalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Eunoia-JournalTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67510D5C2D4AA03900A63CEC /* Eunoia-JournalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Eunoia-JournalUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6780B8E12D6BAED800CD9EEF /* AdSupport.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AdSupport.framework; path = System/Library/Frameworks/AdSupport.framework; sourceTree = SDKROOT; };
 		919FAA92F8718FA4C971D63E /* Pods-Eunoia-Journal.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-Journal.release.xcconfig"; path = "Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal.release.xcconfig"; sourceTree = "<group>"; };
 		9D70918D940D9298A86CDEDA /* Pods-Eunoia-JournalUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-JournalUITests.debug.xcconfig"; path = "Target Support Files/Pods-Eunoia-JournalUITests/Pods-Eunoia-JournalUITests.debug.xcconfig"; sourceTree = "<group>"; };
 		B5AA0D3F25C233724AFEDB86 /* Pods-Eunoia-JournalUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-JournalUITests.release.xcconfig"; path = "Target Support Files/Pods-Eunoia-JournalUITests/Pods-Eunoia-JournalUITests.release.xcconfig"; sourceTree = "<group>"; };
@@ -92,6 +94,7 @@
 				67510D752D4AA5C900A63CEC /* FirebaseAuth in Frameworks */,
 				67510D772D4AA5C900A63CEC /* FirebaseFirestore in Frameworks */,
 				B2C02DC050430691B2B28EC4 /* Pods_Eunoia_Journal.framework in Frameworks */,
+				6780B8E22D6BAED800CD9EEF /* AdSupport.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -117,6 +120,7 @@
 		31E9CC8DFAD79BEE898CB567 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				6780B8E12D6BAED800CD9EEF /* AdSupport.framework */,
 				61F31860CA0EA812C9786026 /* Pods_Eunoia_Journal.framework */,
 				1879935F271446738CA591DF /* Pods_Eunoia_JournalTests.framework */,
 				1FAC8AAECAF8A813DD940B2A /* Pods_Eunoia_JournalUITests.framework */,

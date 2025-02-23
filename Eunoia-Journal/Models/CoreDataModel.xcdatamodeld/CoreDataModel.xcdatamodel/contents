@@ -4,8 +4,8 @@
         <attribute name="content" optional="YES" attributeType="String"/>
         <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="id" optional="YES" attributeType="String"/>
-        <attribute name="images" optional="YES" attributeType="Transformable" valueTransformerName="ImagesTransformer"/>
-        <attribute name="tags" optional="YES" attributeType="Transformable" valueTransformerName="TagsTransformer"/>
+        <attribute name="images" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayTransformer" customClassName="NSArray"/>
+        <attribute name="tags" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayTransformer" customClassName="NSArray"/>
         <attribute name="title" optional="YES" attributeType="String"/>
         <attribute name="userId" optional="YES" attributeType="String"/>
     </entity>

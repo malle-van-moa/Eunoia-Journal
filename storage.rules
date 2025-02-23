@@ -11,17 +11,20 @@ service firebase.storage {
     }
     
     // Journal-Bilder
-    match /journal_images/{userId}/{allPaths=**} {
-      // Lesen und Schreiben nur für authentifizierte Benutzer mit passender userId
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    match /journal_images/{userId}/{entryId}/{imageFile} {
+      // Lesen und Löschen nur für authentifizierte Benutzer mit passender userId
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
       
-      // Zusätzliche Validierungen für Uploads
+      // Strikte Upload-Regeln
       allow create: if request.auth != null 
                    && request.auth.uid == userId
-                   && request.resource.size < 10 * 1024 * 1024  // Max 10MB
-                   && request.resource.contentType.matches('image/.*')  // Nur Bildformate
-                   && request.resource.metadata.keys().hasAll(['entryId', 'userId'])  // Erforderliche Metadaten
-                   && request.resource.metadata.userId == userId;  // Metadaten-Validierung
+                   && request.resource.size < 5 * 1024 * 1024  // Max 5MB
+                   && request.resource.contentType.matches('image/jpeg')  // Nur JPEG
+                   && request.resource.metadata.keys().hasAll(['entryId', 'userId', 'width', 'height'])
+                   && request.resource.metadata.userId == userId
+                   && request.resource.metadata.entryId.matches('^[a-zA-Z0-9_-]+$')
+                   && int(request.resource.metadata.width) <= 2048  // Max Breite
+                   && int(request.resource.metadata.height) <= 2048;  // Max Höhe
     }
   }
 }
