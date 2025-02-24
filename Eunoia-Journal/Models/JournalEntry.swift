@@ -224,14 +224,17 @@ extension JournalEntry {
             title: entity.title,
             content: entity.content,
             location: entity.location,
-            images: entity.imageRelationship.map { image in
-                JournalImage(
-                    id: image.id ?? UUID().uuidString,
-                    url: image.url,
-                    localPath: image.localPath,
-                    uploadDate: image.uploadDate ?? Date()
-                )
-            }
+            images: {
+                guard let imageSet = entity.imageRelationship as? Set<ImageEntity> else { return nil }
+                return imageSet.map { image in
+                    JournalImage(
+                        id: image.id ?? UUID().uuidString,
+                        url: image.url,
+                        localPath: image.localPath,
+                        uploadDate: image.uploadDate ?? Date()
+                    )
+                }
+            }()
         )
     }
 }

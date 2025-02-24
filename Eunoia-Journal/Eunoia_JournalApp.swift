@@ -11,6 +11,14 @@ class AppDelegate: NSObject, UIApplicationDelegate {
   func application(_ application: UIApplication,
                   didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
     FirebaseApp.configure()
+    
+    // Repariere Core Data Store
+    do {
+      try CoreDataManager.shared.performFullRepair()
+    } catch {
+      print("⚠️ Fehler bei der Core Data Reparatur: \(error)")
+    }
+    
     return true
   }
 }

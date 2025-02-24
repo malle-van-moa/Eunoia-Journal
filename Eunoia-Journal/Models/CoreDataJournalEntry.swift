@@ -22,16 +22,20 @@ public class CoreDataJournalEntry: NSManagedObject, Identifiable {
     @NSManaged public var learningNuggetContent: String?
     @NSManaged public var learningNuggetAddedToJournal: Bool
     @NSManaged public var tags: NSArray?
-    @NSManaged private var _imageRelationship: NSSet?
+    @NSManaged public var imageRelationship: NSSet?
     
-    public var imageRelationship: Set<ImageEntity> {
+    public var images: Set<ImageEntity> {
         get {
-            let set = _imageRelationship ?? NSSet()
-            return set as? Set<ImageEntity> ?? Set<ImageEntity>()
+            (imageRelationship as? Set<ImageEntity>) ?? Set<ImageEntity>()
         }
         set {
-            _imageRelationship = newValue as NSSet
+            imageRelationship = newValue as NSSet
         }
+    }
+    
+    // Helper method to safely access images
+    public func safeImageAccess() -> Set<ImageEntity> {
+        return images
     }
 }
 
@@ -48,4 +52,34 @@ extension CoreDataJournalEntry {
 
     @objc(removeImageRelationship:)
     @NSManaged public func removeFromImageRelationship(_ values: NSSet)
+}
+
+extension CoreDataJournalEntry {
+    // MARK: - Safe Image Access Methods
+    
+    public func safelyAddImage(_ image: ImageEntity) {
+        self.managedObjectContext?.performAndWait {
+            addToImageRelationship(image)
+            try? self.managedObjectContext?.save()
+        }
+    }
+    
+    public func safelyRemoveImage(_ image: ImageEntity) {
+        self.managedObjectContext?.performAndWait {
+            removeFromImageRelationship(image)
+            try? self.managedObjectContext?.save()
+        }
+    }
+    
+    public func safelyRemoveAllImages() {
+        self.managedObjectContext?.performAndWait {
+            guard let images = imageRelationship as? Set<ImageEntity> else { return }
+            removeFromImageRelationship(images as NSSet)
+            try? self.managedObjectContext?.save()
+        }
+    }
+    
+    public var imageCount: Int {
+        return images.count
+    }
 } 

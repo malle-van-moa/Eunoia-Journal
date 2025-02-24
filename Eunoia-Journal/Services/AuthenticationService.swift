@@ -35,33 +35,41 @@ class AuthenticationService {
     // MARK: - Google Sign In
     
     func signInWithGoogle() async throws -> User {
-        guard let clientID = FirebaseApp.app()?.options.clientID else {
-            throw AuthError.invalidCredential
+        return try await withCheckedThrowingContinuation { continuation in
+            Task { @MainActor in
+                do {
+                    guard let clientID = FirebaseApp.app()?.options.clientID else {
+                        throw AuthError.invalidCredential
+                    }
+                    
+                    let config = GIDConfiguration(clientID: clientID)
+                    GIDSignIn.sharedInstance.configuration = config
+                    
+                    // Get the root view controller
+                    guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                          let window = windowScene.windows.first,
+                          let rootViewController = window.rootViewController?.topMostViewController() else {
+                        throw AuthError.presentationError
+                    }
+                    
+                    let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+                    
+                    guard let idToken = result.user.idToken?.tokenString else {
+                        throw AuthError.invalidCredential
+                    }
+                    
+                    let credential = GoogleAuthProvider.credential(
+                        withIDToken: idToken,
+                        accessToken: result.user.accessToken.tokenString
+                    )
+                    
+                    let authResult = try await Auth.auth().signIn(with: credential)
+                    continuation.resume(returning: authResult.user)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
-        
-        let config = GIDConfiguration(clientID: clientID)
-        GIDSignIn.sharedInstance.configuration = config
-        
-        // Get the root view controller
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first,
-              let rootViewController = window.rootViewController?.topMostViewController() else {
-            throw AuthError.presentationError
-        }
-        
-        let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
-        
-        guard let idToken = result.user.idToken?.tokenString else {
-            throw AuthError.invalidCredential
-        }
-        
-        let credential = GoogleAuthProvider.credential(
-            withIDToken: idToken,
-            accessToken: result.user.accessToken.tokenString
-        )
-        
-        let authResult = try await Auth.auth().signIn(with: credential)
-        return authResult.user
     }
     
     // MARK: - Apple Sign In

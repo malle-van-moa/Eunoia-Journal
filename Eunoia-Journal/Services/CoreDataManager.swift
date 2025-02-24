@@ -6,6 +6,7 @@ enum CoreDataError: LocalizedError {
     case saveError(String)
     case conversionError(String)
     case entityNotFound
+    case migrationFailed(String)
     
     var errorDescription: String? {
         switch self {
@@ -17,6 +18,8 @@ enum CoreDataError: LocalizedError {
             return "Fehler bei der Datenkonvertierung: \(message)"
         case .entityNotFound:
             return "Eintrag wurde nicht gefunden"
+        case .migrationFailed(let message):
+            return "Migration fehlgeschlagen: \(message)"
         }
     }
 }
@@ -33,6 +36,12 @@ class CoreDataManager {
         
         persistentContainer = NSPersistentContainer(name: "CoreDataModel")
         
+        // Migrationsoptions konfigurieren
+        let options = NSPersistentStoreDescription()
+        options.shouldMigrateStoreAutomatically = true
+        options.shouldInferMappingModelAutomatically = true
+        persistentContainer.persistentStoreDescriptions = [options]
+        
         // Verbesserte Fehlerbehandlung beim Laden der Stores
         persistentContainer.loadPersistentStores { description, error in
             if let error = error {
@@ -47,6 +56,89 @@ class CoreDataManager {
         context = persistentContainer.viewContext
         context.automaticallyMergesChangesFromParent = true
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+    }
+    
+    // MARK: - Migration and Repair Methods
+    
+    func repairImageRelationships() throws {
+        let fetchRequest: NSFetchRequest<CoreDataJournalEntry> = CoreDataJournalEntry.fetchRequest()
+        
+        do {
+            let entries = try context.fetch(fetchRequest)
+            
+            for entry in entries {
+                context.performAndWait {
+                    if entry.imageRelationship == nil {
+                        entry.imageRelationship = NSSet()
+                    }
+                }
+            }
+            
+            try context.save()
+        } catch {
+            throw CoreDataError.migrationFailed("Fehler beim Reparieren der Bildbeziehungen: \(error)")
+        }
+    }
+    
+    func validateDataStore() throws {
+        // Überprüfen und reparieren der Bildbeziehungen
+        try repairImageRelationships()
+        
+        // Überprüfen auf beschädigte Einträge
+        let fetchRequest: NSFetchRequest<CoreDataJournalEntry> = CoreDataJournalEntry.fetchRequest()
+        
+        do {
+            let entries = try context.fetch(fetchRequest)
+            for entry in entries {
+                if entry.id == nil {
+                    entry.id = UUID().uuidString
+                }
+                
+                if entry.date == nil {
+                    entry.date = Date()
+                }
+                
+                if entry.tags == nil {
+                    entry.tags = []
+                }
+            }
+            
+            try context.save()
+        } catch {
+            throw CoreDataError.migrationFailed("Fehler bei der Validierung: \(error)")
+        }
+    }
+    
+    func performFullRepair() throws {
+        do {
+            try validateDataStore()
+        } catch {
+            // Wenn die Validierung fehlschlägt, versuchen wir einen Reset
+            try resetStore()
+        }
+    }
+    
+    // MARK: - Store Management
+    
+    func resetStore() throws {
+        // Stores entfernen
+        for store in persistentContainer.persistentStoreCoordinator.persistentStores {
+            try persistentContainer.persistentStoreCoordinator.remove(store)
+        }
+        
+        // Store-Dateien löschen
+        if let storeURL = persistentContainer.persistentStoreCoordinator.persistentStores.first?.url {
+            try FileManager.default.removeItem(at: storeURL)
+            try FileManager.default.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-shm"))
+            try FileManager.default.removeItem(at: storeURL.deletingPathExtension().appendingPathExtension("sqlite-wal"))
+        }
+        
+        // Container neu laden
+        persistentContainer.loadPersistentStores { (description, error) in
+            if let error = error {
+                print("Fehler beim Neuladen des Stores: \(error)")
+            }
+        }
     }
     
     // MARK: - Helper Methods
@@ -141,8 +233,10 @@ class CoreDataManager {
                 // Handle images
                 if let images = entry.images {
                     // Remove old images
-                    for image in entity.imageRelationship {
-                        context.delete(image)
+                    if let oldImages = entity.imageRelationship as? Set<ImageEntity> {
+                        for image in oldImages {
+                            context.delete(image)
+                        }
                     }
                     
                     // Add new images
@@ -155,7 +249,7 @@ class CoreDataManager {
                         imageEntity.journalEntry = entity
                         return imageEntity
                     }
-                    entity.imageRelationship = Set(imageEntities)
+                    entity.imageRelationship = NSSet(array: imageEntities)
                 }
                 
                 // Handle learning nugget
