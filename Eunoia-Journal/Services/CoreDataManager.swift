@@ -31,28 +31,14 @@ class CoreDataManager {
         // Register custom transformers
         StringArrayTransformer.register()
         
-        persistentContainer = NSPersistentContainer(name: "Eunoia")
+        persistentContainer = NSPersistentContainer(name: "CoreDataModel")
         
         // Verbesserte Fehlerbehandlung beim Laden der Stores
         persistentContainer.loadPersistentStores { description, error in
             if let error = error {
                 print("❌ Core Data failed to load: \(error.localizedDescription)")
                 print("Detailed error: \(error)")
-                
-                // Versuche das Backup-Model zu laden
-                if let modelURL = Bundle.main.url(forResource: "CoreDataModel", withExtension: "momd") {
-                    do {
-                        let model = NSManagedObjectModel(contentsOf: modelURL)
-                        let container = NSPersistentContainer(name: "CoreDataModel", managedObjectModel: model!)
-                        container.loadPersistentStores { description, error in
-                            if let error = error {
-                                fatalError("Failed to load Core Data: \(error)")
-                            }
-                        }
-                    } catch {
-                        fatalError("Failed to load backup Core Data model: \(error)")
-                    }
-                }
+                fatalError("Failed to load Core Data: \(error)")
             } else {
                 print("✅ Core Data successfully loaded")
             }
@@ -86,35 +72,14 @@ class CoreDataManager {
     }
     
     func fetchJournalEntries(for userId: String) throws -> [JournalEntry] {
-        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        let request = NSFetchRequest<CoreDataJournalEntry>(entityName: "CoreDataJournalEntry")
         request.predicate = NSPredicate(format: "userId == %@", userId)
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \JournalEntryEntity.date, ascending: false)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \CoreDataJournalEntry.date, ascending: false)]
         
         do {
             let entities = try context.fetch(request)
-            return entities.map { entity -> JournalEntry in
-                JournalEntry(
-                    id: entity.id,
-                    userId: entity.userId ?? "",
-                    date: entity.date ?? Date(),
-                    gratitude: entity.gratitude ?? "",
-                    highlight: entity.highlight ?? "",
-                    learning: entity.learning ?? "",
-                    learningNugget: entity.learningNuggetCategory != nil ? LearningNugget(
-                        userId: entity.userId ?? "",
-                        category: LearningNugget.Category(rawValue: entity.learningNuggetCategory ?? "") ?? .persönlichesWachstum,
-                        title: "Lernimpuls",
-                        content: entity.learningNuggetContent ?? "",
-                        isAddedToJournal: entity.learningNuggetAddedToJournal
-                    ) : nil,
-                    lastModified: entity.lastModified ?? Date(),
-                    syncStatus: SyncStatus(rawValue: entity.syncStatus ?? "") ?? .pendingUpload,
-                    title: entity.title,
-                    content: entity.content,
-                    location: entity.location,
-                    imageURLs: convertFromNSArray(entity.imageURLs),
-                    localImagePaths: convertFromNSArray(entity.localImagePaths)
-                )
+            return entities.map { entity in
+                JournalEntry(from: entity)
             }
         } catch {
             throw CoreDataError.fetchError(error.localizedDescription)
@@ -122,7 +87,7 @@ class CoreDataManager {
     }
     
     func fetchPendingEntries(for userId: String) throws -> [JournalEntry] {
-        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        let request = NSFetchRequest<CoreDataJournalEntry>(entityName: "CoreDataJournalEntry")
         request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
             NSPredicate(format: "userId == %@", userId),
             NSPredicate(format: "syncStatus == %@", SyncStatus.pendingUpload.rawValue)
@@ -130,12 +95,8 @@ class CoreDataManager {
         
         do {
             let entities = try context.fetch(request)
-            return try entities.compactMap { entity -> JournalEntry? in
-                do {
-                    return JournalEntry(from: entity)
-                } catch {
-                    throw CoreDataError.conversionError(error.localizedDescription)
-                }
+            return entities.map { entity in
+                JournalEntry(from: entity)
             }
         } catch {
             throw CoreDataError.fetchError(error.localizedDescription)
@@ -143,7 +104,7 @@ class CoreDataManager {
     }
     
     func saveJournalEntry(_ entry: JournalEntry) throws {
-        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        let request = NSFetchRequest<CoreDataJournalEntry>(entityName: "CoreDataJournalEntry")
         request.predicate = NSPredicate(format: "id == %@", entry.id ?? "")
         
         var saveError: Error?
@@ -151,14 +112,14 @@ class CoreDataManager {
         context.performAndWait {
             do {
                 let results = try context.fetch(request)
-                let entity: JournalEntryEntity
+                let entity: CoreDataJournalEntry
                 
                 if let existingEntity = results.first {
                     // Update existing entity
                     entity = existingEntity
                 } else {
                     // Create new entity
-                    entity = JournalEntryEntity(context: context)
+                    entity = CoreDataJournalEntry(context: context)
                     entity.id = entry.id
                 }
                 
@@ -176,8 +137,26 @@ class CoreDataManager {
                 entity.title = entry.title
                 entity.content = entry.content
                 entity.location = entry.location
-                entity.imageURLs = convertToNSArray(entry.imageURLs)
-                entity.localImagePaths = convertToNSArray(entry.localImagePaths)
+                
+                // Handle images
+                if let images = entry.images {
+                    // Remove old images
+                    for image in entity.imageRelationship {
+                        context.delete(image)
+                    }
+                    
+                    // Add new images
+                    let imageEntities = images.map { image in
+                        let imageEntity = ImageEntity(context: context,
+                                                    id: image.id,
+                                                    url: image.url,
+                                                    localPath: image.localPath)
+                        imageEntity.uploadDate = image.uploadDate
+                        imageEntity.journalEntry = entity
+                        return imageEntity
+                    }
+                    entity.imageRelationship = Set(imageEntities)
+                }
                 
                 // Handle learning nugget
                 if let nugget = entry.learningNugget {
@@ -190,7 +169,7 @@ class CoreDataManager {
                     entity.learningNuggetAddedToJournal = false
                 }
                 
-                // Versuche zu speichern
+                // Save context
                 if context.hasChanges {
                     do {
                         try context.save()
@@ -209,7 +188,7 @@ class CoreDataManager {
     }
     
     func deleteJournalEntry(withId id: String) throws {
-        let request = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+        let request = NSFetchRequest<CoreDataJournalEntry>(entityName: "CoreDataJournalEntry")
         request.predicate = NSPredicate(format: "id == %@", id)
         
         do {
@@ -229,8 +208,7 @@ class CoreDataManager {
         return try await withCheckedThrowingContinuation { continuation in
             context.perform {
                 do {
-                    // Prüfe ob der Eintrag existiert
-                    let fetchRequest = NSFetchRequest<JournalEntryEntity>(entityName: "JournalEntryEntity")
+                    let fetchRequest = NSFetchRequest<CoreDataJournalEntry>(entityName: "CoreDataJournalEntry")
                     fetchRequest.predicate = NSPredicate(format: "id == %@", id)
                     
                     let results = try self.context.fetch(fetchRequest)
@@ -238,13 +216,11 @@ class CoreDataManager {
                     if let entityToDelete = results.first {
                         self.context.delete(entityToDelete)
                         
-                        // Speichere den Kontext
                         if self.context.hasChanges {
                             try self.context.save()
                         }
                         continuation.resume()
                     } else {
-                        // Eintrag existiert nicht mehr
                         continuation.resume()
                     }
                 } catch {
@@ -358,5 +334,39 @@ class CoreDataManager {
                 print("Error deleting \(entity.name!) data: \(error)")
             }
         }
+    }
+    
+    // MARK: - Image Management
+    
+    func saveImage(for journalEntryId: String, url: String?, localPath: String?) throws -> ImageEntity {
+        let request = NSFetchRequest<CoreDataJournalEntry>(entityName: "CoreDataJournalEntry")
+        request.predicate = NSPredicate(format: "id == %@", journalEntryId)
+        
+        let results = try context.fetch(request)
+        guard let journalEntry = results.first else {
+            throw CoreDataError.entityNotFound
+        }
+        
+        let imageEntity = ImageEntity(context: context,
+                                    id: UUID().uuidString,
+                                    url: url,
+                                    localPath: localPath)
+        imageEntity.journalEntry = journalEntry
+        
+        try context.save()
+        return imageEntity
+    }
+    
+    func deleteImage(_ image: ImageEntity) throws {
+        context.delete(image)
+        try context.save()
+    }
+    
+    func updateImage(_ image: ImageEntity, url: String?, localPath: String?) throws {
+        image.url = url
+        image.localPath = localPath
+        image.uploadDate = Date()
+        
+        try context.save()
     }
 } 

@@ -1,12 +1,64 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23507" systemVersion="24C101" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    <entity name="ImageEntity" representedClassName=".ImageEntity" syncable="YES">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="localPath" optional="YES" attributeType="String"/>
+        <attribute name="uploadDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="url" optional="YES" attributeType="String"/>
+        <relationship name="journalEntry" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CoreDataJournalEntry" inverseName="imageRelationship" inverseEntity="CoreDataJournalEntry"/>
+    </entity>
     <entity name="CoreDataJournalEntry" representedClassName=".CoreDataJournalEntry" syncable="YES">
         <attribute name="content" optional="YES" attributeType="String"/>
         <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="gratitude" optional="YES" attributeType="String"/>
+        <attribute name="highlight" optional="YES" attributeType="String"/>
         <attribute name="id" optional="YES" attributeType="String"/>
-        <attribute name="images" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayTransformer" customClassName="NSArray"/>
+        <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="learning" optional="YES" attributeType="String"/>
+        <attribute name="learningNuggetAddedToJournal" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="learningNuggetCategory" optional="YES" attributeType="String"/>
+        <attribute name="learningNuggetContent" optional="YES" attributeType="String"/>
+        <attribute name="location" optional="YES" attributeType="String"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String"/>
         <attribute name="tags" optional="YES" attributeType="Transformable" valueTransformerName="StringArrayTransformer" customClassName="NSArray"/>
         <attribute name="title" optional="YES" attributeType="String"/>
         <attribute name="userId" optional="YES" attributeType="String"/>
+        <relationship name="imageRelationship" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ImageEntity" inverseName="journalEntry" inverseEntity="ImageEntity"/>
+    </entity>
+    <entity name="GoalEntity" representedClassName="GoalEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="goalDescription" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="priority" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="targetDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <relationship name="visionBoard" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="VisionBoardEntity" inverseName="goals" inverseEntity="VisionBoardEntity"/>
+    </entity>
+    <entity name="PersonalValueEntity" representedClassName="PersonalValueEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="importance" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="valueDescription" optional="YES" attributeType="String"/>
+        <relationship name="visionBoard" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="VisionBoardEntity" inverseName="personalValues" inverseEntity="VisionBoardEntity"/>
+    </entity>
+    <entity name="VisionBoardEntity" representedClassName="VisionBoardEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="lastModified" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lifestyleDailyRoutine" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleHealth" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleHobbies" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleLivingEnvironment" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleRelationships" optional="YES" attributeType="String"/>
+        <attribute name="lifestyleWorkLife" optional="YES" attributeType="String"/>
+        <attribute name="personalityBehaviors" optional="YES" attributeType="String"/>
+        <attribute name="personalityGrowth" optional="YES" attributeType="String"/>
+        <attribute name="personalityHabits" optional="YES" attributeType="String"/>
+        <attribute name="personalityMindset" optional="YES" attributeType="String"/>
+        <attribute name="personalitySkills" optional="YES" attributeType="String"/>
+        <attribute name="personalityTraits" optional="YES" attributeType="String"/>
+        <attribute name="syncStatus" optional="YES" attributeType="String"/>
+        <attribute name="userId" optional="YES" attributeType="String"/>
+        <relationship name="goals" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="GoalEntity" inverseName="visionBoard" inverseEntity="GoalEntity"/>
+        <relationship name="personalValues" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PersonalValueEntity" inverseName="visionBoard" inverseEntity="PersonalValueEntity"/>
     </entity>
 </model>

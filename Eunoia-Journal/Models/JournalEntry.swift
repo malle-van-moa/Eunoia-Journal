@@ -24,6 +24,24 @@ struct JournalEntry: Identifiable, Codable, Equatable {
     var location: String?
     var imageURLs: [String]?
     var localImagePaths: [String]?
+    var images: [JournalImage]?
+    
+    struct JournalImage: Codable, Identifiable, Equatable {
+        let id: String
+        let url: String?
+        let localPath: String?
+        let uploadDate: Date
+        
+        init(id: String = UUID().uuidString,
+             url: String? = nil,
+             localPath: String? = nil,
+             uploadDate: Date = Date()) {
+            self.id = id
+            self.url = url
+            self.localPath = localPath
+            self.uploadDate = uploadDate
+        }
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -41,6 +59,7 @@ struct JournalEntry: Identifiable, Codable, Equatable {
         case location
         case imageURLs
         case localImagePaths
+        case images
     }
     
     // Custom encoding to handle Timestamp
@@ -86,6 +105,7 @@ struct JournalEntry: Identifiable, Codable, Equatable {
         try container.encodeIfPresent(location, forKey: .location)
         try container.encodeIfPresent(imageURLs, forKey: .imageURLs)
         try container.encodeIfPresent(localImagePaths, forKey: .localImagePaths)
+        try container.encodeIfPresent(images, forKey: .images)
     }
     
     // Custom decoding to handle Timestamp
@@ -119,6 +139,7 @@ struct JournalEntry: Identifiable, Codable, Equatable {
         location = try container.decodeIfPresent(String.self, forKey: .location)
         imageURLs = try container.decodeIfPresent([String].self, forKey: .imageURLs)
         localImagePaths = try container.decodeIfPresent([String].self, forKey: .localImagePaths)
+        images = try container.decodeIfPresent([JournalImage].self, forKey: .images)
     }
     
     // Convenience initializer
@@ -136,7 +157,8 @@ struct JournalEntry: Identifiable, Codable, Equatable {
          content: String? = nil,
          location: String? = nil,
          imageURLs: [String]? = nil,
-         localImagePaths: [String]? = nil) {
+         localImagePaths: [String]? = nil,
+         images: [JournalImage]? = nil) {
         self.id = id
         self.userId = userId
         self.date = date
@@ -152,6 +174,7 @@ struct JournalEntry: Identifiable, Codable, Equatable {
         self.location = location
         self.imageURLs = imageURLs
         self.localImagePaths = localImagePaths
+        self.images = images
     }
     
     static func == (lhs: JournalEntry, rhs: JournalEntry) -> Bool {
@@ -168,32 +191,47 @@ struct JournalEntry: Identifiable, Codable, Equatable {
         lhs.location == rhs.location &&
         lhs.imageURLs == rhs.imageURLs &&
         lhs.localImagePaths == rhs.localImagePaths &&
+        lhs.images == rhs.images &&
         lhs.learningNugget == rhs.learningNugget
     }
 }
 
 // Extension for Core Data conversion
 extension JournalEntry {
-    init(from entity: JournalEntryEntity) {
-        self.id = entity.id
-        self.userId = entity.userId ?? ""
-        self.date = entity.date ?? Date()
-        self.gratitude = entity.gratitude ?? ""
-        self.highlight = entity.highlight ?? ""
-        self.learning = entity.learning ?? ""
-        self.lastModified = entity.lastModified ?? Date()
-        self.syncStatus = SyncStatus(rawValue: entity.syncStatus ?? "pendingUpload") ?? .pendingUpload
-        
-        if let nuggetCategory = entity.learningNuggetCategory,
-           let nuggetContent = entity.learningNuggetContent,
-           let category = LearningNugget.Category(rawValue: nuggetCategory) {
-            self.learningNugget = LearningNugget(
-                userId: self.userId,
-                category: category,
-                title: "Lernimpuls",
-                content: nuggetContent,
-                isAddedToJournal: entity.learningNuggetAddedToJournal
-            )
-        }
+    init(from entity: CoreDataJournalEntry) {
+        self.init(
+            id: entity.id,
+            userId: entity.userId ?? "",
+            date: entity.date ?? Date(),
+            gratitude: entity.gratitude ?? "",
+            highlight: entity.highlight ?? "",
+            learning: entity.learning ?? "",
+            learningNugget: entity.learningNuggetCategory.flatMap { category in
+                guard let content = entity.learningNuggetContent,
+                      let categoryEnum = LearningNugget.Category(rawValue: category) else {
+                    return nil
+                }
+                return LearningNugget(
+                    userId: entity.userId ?? "",
+                    category: categoryEnum,
+                    title: "Lernimpuls",
+                    content: content,
+                    isAddedToJournal: entity.learningNuggetAddedToJournal
+                )
+            },
+            lastModified: entity.lastModified ?? Date(),
+            syncStatus: SyncStatus(rawValue: entity.syncStatus ?? "") ?? .pendingUpload,
+            title: entity.title,
+            content: entity.content,
+            location: entity.location,
+            images: entity.imageRelationship.map { image in
+                JournalImage(
+                    id: image.id ?? UUID().uuidString,
+                    url: image.url,
+                    localPath: image.localPath,
+                    uploadDate: image.uploadDate ?? Date()
+                )
+            }
+        )
     }
 }

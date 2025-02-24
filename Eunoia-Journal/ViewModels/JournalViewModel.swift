@@ -535,6 +535,45 @@ class JournalViewModel: ObservableObject {
     
     // MARK: - Image Handling
     
+    func addImage(to entry: JournalEntry, url: String?, localPath: String?) {
+        var updatedEntry = entry
+        let newImage = JournalEntry.JournalImage(url: url, localPath: localPath)
+        
+        if var images = updatedEntry.images {
+            images.append(newImage)
+            updatedEntry.images = images
+        } else {
+            updatedEntry.images = [newImage]
+        }
+        
+        saveEntry(updatedEntry)
+    }
+    
+    func removeImage(from entry: JournalEntry, at index: Int) {
+        var updatedEntry = entry
+        if var images = updatedEntry.images {
+            images.remove(at: index)
+            updatedEntry.images = images
+            saveEntry(updatedEntry)
+        }
+    }
+    
+    func updateImage(in entry: JournalEntry, at index: Int, url: String?, localPath: String?) {
+        var updatedEntry = entry
+        if var images = updatedEntry.images {
+            let currentImage = images[index]
+            let updatedImage = JournalEntry.JournalImage(
+                id: currentImage.id,
+                url: url ?? currentImage.url,
+                localPath: localPath ?? currentImage.localPath,
+                uploadDate: Date()
+            )
+            images[index] = updatedImage
+            updatedEntry.images = images
+            saveEntry(updatedEntry)
+        }
+    }
+    
     func saveEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
         // Wenn der Eintrag bereits Bilder hat, lösche diese zuerst
         if let existingUrls = entry.imageURLs {
