@@ -8,20 +8,23 @@ struct WeekProgressView: View {
     private let weekdays = ["M", "D", "M", "D", "F", "S", "S"]
     
     var body: some View {
-        HStack(spacing: 12) {
-            ForEach(0..<7) { index in
-                let day = index + 1
-                DayIndicator(
-                    label: weekdays[index],
-                    isJournaled: journaledDays.contains(day),
-                    isToday: day == currentDay
-                )
-                .onTapGesture {
-                    onDayTapped?(day)
+        GeometryReader { geometry in
+            HStack(spacing: 0) {
+                ForEach(0..<7) { index in
+                    let day = index + 1
+                    DayIndicator(
+                        label: weekdays[index],
+                        isJournaled: journaledDays.contains(day),
+                        isToday: day == currentDay
+                    )
+                    .onTapGesture {
+                        onDayTapped?(day)
+                    }
+                    .frame(width: geometry.size.width / 7)
                 }
             }
+            .frame(maxHeight: .infinity)
         }
-        .padding(.vertical, 8)
     }
 }
 
@@ -33,15 +36,15 @@ struct DayIndicator: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.caption.weight(.medium))
+                .foregroundColor(isToday ? .accentColor : .primary.opacity(0.7))
             
             Circle()
-                .fill(isJournaled ? Color.blue : Color.secondary.opacity(0.2))
+                .fill(isJournaled ? Color.accentColor : Color.secondary.opacity(0.2))
                 .frame(width: 24, height: 24)
                 .overlay(
                     Circle()
-                        .strokeBorder(isToday ? Color.accentColor : .clear, lineWidth: 2)
+                        .strokeBorder(isToday ? Color.accentColor : .clear, lineWidth: 1.5)
                 )
                 .overlay(
                     Circle()
@@ -50,16 +53,7 @@ struct DayIndicator: View {
                 )
                 .animation(.easeInOut, value: isJournaled)
         }
-        .overlay(
-            Group {
-                if isToday {
-                    Circle()
-                        .stroke(Color.accentColor.opacity(0.3), lineWidth: 4)
-                        .frame(width: 36, height: 36)
-                        .blur(radius: 4)
-                }
-            }
-        )
+        .contentShape(Rectangle())
     }
 }
 
@@ -68,5 +62,6 @@ struct DayIndicator: View {
         journaledDays: [1, 2, 3, 5, 6, 7],
         currentDay: 4
     )
+    .frame(height: 50)
     .padding()
 } 

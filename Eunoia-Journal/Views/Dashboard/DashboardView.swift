@@ -68,25 +68,30 @@ struct DashboardView: View {
                             // Progress Card
                             DashboardCard(
                                 title: "Fortschritt",
-                                systemImage: "flame.fill",
+                                systemImage: "chart.bar.fill",
                                 gradient: Gradient(colors: [.red.opacity(0.4), .orange.opacity(0.4)])
                             ) {
-                                VStack(spacing: 4) {
-                                    StreakIndicatorView(
-                                        streakCount: viewModel.streakCount,
-                                        isAnimating: viewModel.isStreakAnimating
-                                    )
-                                    .frame(height: 40)
-                                    
-                                    WeekProgressView(
-                                        journaledDays: viewModel.journaledDaysThisWeek,
-                                        currentDay: viewModel.currentWeekday
-                                    ) { day in
-                                        viewModel.checkMissedDay(day)
+                                GeometryReader { geometry in
+                                    HStack(alignment: .center, spacing: 0) {
+                                        // Wochentags-Anzeige (linke 70%)
+                                        WeekProgressView(
+                                            journaledDays: viewModel.journaledDaysThisWeek,
+                                            currentDay: viewModel.currentWeekday
+                                        ) { day in
+                                            viewModel.checkMissedDay(day)
+                                        }
+                                        .frame(width: geometry.size.width * 0.7)
+                                        
+                                        // Streak-Anzeige (rechte 30%)
+                                        StreakIndicatorView(
+                                            streakCount: viewModel.streakCount,
+                                            isAnimating: viewModel.isStreakAnimating
+                                        )
+                                        .frame(width: geometry.size.width * 0.3)
                                     }
-                                    .frame(height: 30)
+                                    .frame(maxHeight: .infinity)
                                 }
-                                .frame(maxWidth: .infinity)
+                                .frame(height: 60)
                             }
                             
                             // Challenge Card
@@ -134,7 +139,7 @@ struct DashboardView: View {
                                         }
                                     }
                                     .buttonStyle(PlainButtonStyle())
-                                    .frame(width: (geometry.size.width - 48) / 2)
+                                    .frame(width: (geometry.size.width - 16) / 2)
                                     .frame(height: 110)
                                     
                                     // Vision Board Card
@@ -146,11 +151,11 @@ struct DashboardView: View {
                                         }
                                     } label: {
                                         DashboardCard(
-                                            title: "Vision Board",
+                                            title: "Vision",
                                             systemImage: "star.fill",
                                             gradient: Gradient(colors: [.purple.opacity(0.4), .pink.opacity(0.4)])
                                         ) {
-                                            Text("Manifestiere deine Vision")
+                                            Text("Manifestiere deine Zukunft")
                                                 .font(.subheadline)
                                                 .foregroundColor(.secondary)
                                                 .lineLimit(2)
@@ -159,11 +164,10 @@ struct DashboardView: View {
                                         }
                                     }
                                     .buttonStyle(PlainButtonStyle())
-                                    .frame(width: (geometry.size.width - 48) / 2)
+                                    .frame(width: (geometry.size.width - 16) / 2)
                                     .frame(height: 110)
                                 }
                                 .frame(maxWidth: .infinity)
-                                .padding(.horizontal, 16)
                             }
                         }
                         .padding(.horizontal)
