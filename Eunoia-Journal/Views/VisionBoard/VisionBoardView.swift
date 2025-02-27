@@ -29,7 +29,7 @@ struct RadarChartBackground: View {
     }
     
     private var radius: CGFloat {
-        min(geometry.size.width, geometry.size.height) / 2
+        min(geometry.size.width, geometry.size.height) / 2.5 // Kleinerer Radius für mehr Platz
     }
     
     private var backgroundCircles: [CGFloat] {
@@ -45,15 +45,24 @@ struct RadarChartBackground: View {
             )
             
             // Anpassung der Labelposition für bessere Lesbarkeit
-            var labelOffset: CGFloat = 35
+            var labelOffset: CGFloat = 40
             
-            // Horizontale Positionen (3 und 9 Uhr)
-            if abs(sin(angle)) < 0.1 { 
-                labelOffset = 50 // Erhöhter Abstand für links und rechts
-            } 
+            // Spezielle Behandlung für bestimmte Kategorien
+            let fullName = values[index].name
+            let isTopOrBottom = abs(cos(angle)) < 0.1
+            
             // Vertikale Positionen (12 und 6 Uhr)
-            else if abs(cos(angle)) < 0.1 { 
-                labelOffset = 50 // Erhöhter Abstand für oben und unten
+            if isTopOrBottom {
+                // Größerer Abstand für oben (Gesundheit) und unten (Finanzen)
+                if sin(angle) < 0 {
+                    labelOffset = 30 // Noch mehr Abstand für oben (Gesundheit)
+                } else {
+                    labelOffset = 30 // Deutlich mehr Abstand für unten (Finanzen)
+                }
+            }
+            // Horizontale Positionen (3 und 9 Uhr)
+            else if abs(sin(angle)) < 0.1 {
+                labelOffset = 30 // Erhöhter Abstand für links und rechts
             }
             
             let labelPosition = CGPoint(
@@ -62,7 +71,6 @@ struct RadarChartBackground: View {
             )
             
             // Optimierte Kurzbezeichnung erstellen
-            let fullName = values[index].name
             let shortName = getOptimizedLabel(for: fullName)
             
             return RadarChartAxisPoint(
@@ -122,14 +130,42 @@ struct RadarChartBackground: View {
                     isOutermost: level == maxValue
                 )
                 
-                // Skala-Beschriftung (nur für gerade Werte)
+                // Skala-Beschriftungen für gerade Werte (weniger auffällig)
                 if level % 2 == 0 {
+                    // Obere Beschriftung (0 Uhr)
                     Text("\(level)")
-                        .font(.system(size: 8))
-                        .foregroundColor(.gray)
+                        .font(.system(size: 6))
+                        .foregroundColor(.gray.opacity(0.4))
                         .position(
                             x: center.x,
-                            y: center.y - radius
+                            y: center.y - radius - 2 // Näher am Kreis
+                        )
+                    
+                    // Untere Beschriftung (6 Uhr)
+                    Text("\(level)")
+                        .font(.system(size: 6))
+                        .foregroundColor(.gray.opacity(0.4))
+                        .position(
+                            x: center.x,
+                            y: center.y + radius + 2 // Näher am Kreis
+                        )
+                    
+                    // Rechte Beschriftung (3 Uhr)
+                    Text("\(level)")
+                        .font(.system(size: 6))
+                        .foregroundColor(.gray.opacity(0.4))
+                        .position(
+                            x: center.x + radius + 2, // Näher am Kreis
+                            y: center.y
+                        )
+                    
+                    // Linke Beschriftung (9 Uhr)
+                    Text("\(level)")
+                        .font(.system(size: 6))
+                        .foregroundColor(.gray.opacity(0.4))
+                        .position(
+                            x: center.x - radius - 2, // Näher am Kreis
+                            y: center.y
                         )
                 }
             }
@@ -137,6 +173,7 @@ struct RadarChartBackground: View {
             // Achsenlinien und Beschriftungen
             ForEach(axisPoints.indices, id: \.self) { index in
                 let point = axisPoints[index]
+                let isVertical = abs(cos(point.angle)) < 0.1
                 
                 // Achsenlinie
                 Path { path in
@@ -146,24 +183,23 @@ struct RadarChartBackground: View {
                 .stroke(Color.gray.opacity(0.5), lineWidth: 1)
                 
                 // Optimierte Beschriftung mit Rotation für horizontale Achsen
-                ZStack {
-                    // Hintergrund für bessere Lesbarkeit
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(.systemBackground).opacity(0.7))
-                        .frame(width: 75, height: 16)
-                    
-                    // Beschriftungstext
-                    Text(point.shortName)
-                        .font(.system(size: 10))
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                        .foregroundColor(.primary)
-                }
-                .frame(width: 75, height: 16)
-                // Rotation für horizontale Beschriftungen (3 und 9 Uhr)
-                .rotationEffect(isHorizontalAxis(angle: point.angle) ? Angle(degrees: getRotationAngle(angle: point.angle)) : .zero)
-                .position(point.labelPosition)
+                Text(point.shortName)
+                    .font(.system(size: 11))
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .foregroundColor(.primary) // Primäre Textfarbe statt weiß
+                    .frame(width: isVertical ? 90 : 80, height: 20)
+                    // Rotation für horizontale Beschriftungen (3 und 9 Uhr)
+                    .rotationEffect(isHorizontalAxis(angle: point.angle) ? Angle(degrees: getRotationAngle(angle: point.angle)) : .zero)
+                    .position(point.labelPosition)
+                    .zIndex(1) // Stellt sicher, dass die Beschriftungen über anderen Elementen liegen
             }
+            
+            // Debug-Ausgabe der Kategorien (nur während der Entwicklung)
+            // Text(values.map { getOptimizedLabel(for: $0.name) }.joined(separator: ", "))
+            //     .font(.caption)
+            //     .foregroundColor(.red)
+            //     .position(center)
         }
     }
     
@@ -229,7 +265,7 @@ struct RadarChartDataLayer: View {
     }
     
     private var radius: CGFloat {
-        min(geometry.size.width, geometry.size.height) / 2
+        min(geometry.size.width, geometry.size.height) / 2.5 // Kleinerer Radius für mehr Platz
     }
     
     private var dataValues: [CGFloat] {
@@ -314,36 +350,30 @@ struct DataPolygon: View {
 struct RadarChartLegend: View {
     var body: some View {
         HStack(spacing: 20) {
-            // Wichtigkeit
+            // Wichtigkeit (blau)
             HStack(spacing: 8) {
                 Rectangle()
-                    .fill(Color.blue.opacity(0.4))
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        Rectangle()
-                            .stroke(Color.blue, lineWidth: 1)
-                    )
+                    .fill(Color.blue)
+                    .frame(width: 15, height: 15)
                 Text("Wichtigkeit")
                     .font(.caption)
+                    .foregroundColor(.primary) // Primäre Textfarbe statt weiß
             }
             
-            // Zufriedenheit
+            // Zufriedenheit (grün)
             HStack(spacing: 8) {
                 Rectangle()
-                    .fill(Color.green.opacity(0.4))
-                    .frame(width: 16, height: 16)
-                    .overlay(
-                        Rectangle()
-                            .stroke(Color.green, lineWidth: 1)
-                    )
+                    .fill(Color.green)
+                    .frame(width: 15, height: 15)
                 Text("Zufriedenheit")
                     .font(.caption)
+                    .foregroundColor(.primary) // Primäre Textfarbe statt weiß
             }
         }
-        .padding(8)
-        .background(Color(.systemBackground).opacity(0.9))
+        .padding(.vertical, 8)
+        .padding(.horizontal, 16)
+        .background(Color(.systemBackground)) // Systemhintergrund statt schwarz
         .cornerRadius(8)
-        .shadow(radius: 2)
     }
 }
 
@@ -353,7 +383,8 @@ struct RadarChartView: View {
     let maxValue: Int = 10
     
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 20) {
+            // Radar-Chart mit mehr Platz oben und unten
             GeometryReader { geometry in
                 ZStack {
                     // Hintergrund und Achsen
@@ -365,21 +396,22 @@ struct RadarChartView: View {
                     // Zufriedenheits-Daten
                     RadarChartDataLayer(values: values, maxValue: maxValue, geometry: geometry, isImportance: false)
                 }
+                .padding(.top, 10) // Mehr Platz oben für "Gesundheit"
+                .padding(.bottom, 60) // Mehr Platz unten für "Finanzen"
             }
-            .padding(.bottom, 10)
+            .aspectRatio(1, contentMode: .fit)
+            .frame(height: 350)
             
-            VStack(spacing: 5) {
-                RadarChartLegend()
-                
-                Text("Skala: 1-10")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.top, 5)
+            // Legende mit mehr Abstand zum Diagramm
+            RadarChartLegend()
+                .padding(.top, 10)
+            
+            Text("Skala: 1-10")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.top, 5)
         }
-        .aspectRatio(1, contentMode: .fit)
         .padding()
-        .frame(height: 350)
         .background(Color(.secondarySystemBackground).opacity(0.5))
         .cornerRadius(10)
     }
