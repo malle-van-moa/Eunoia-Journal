@@ -52,6 +52,12 @@ struct ProfileView: View {
                 } label: {
                     Label(LocalizedStringKey("Data Management"), systemImage: "externaldrive")
                 }
+                
+                NavigationLink {
+                    APIKeySettingsView()
+                } label: {
+                    Label(LocalizedStringKey("API-Einstellungen"), systemImage: "key")
+                }
             }
             
             // Information Section

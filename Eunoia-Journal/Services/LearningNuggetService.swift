@@ -1,13 +1,39 @@
 import Foundation
 import FirebaseFirestore
 import FirebaseAuth
+import Combine
 
 class LearningNuggetService {
-    static let shared = LearningNuggetService()
+    // MARK: - Properties
     private let db = Firestore.firestore()
     private let openAIService = OpenAIService.shared
+    private let deepSeekService = DeepSeekService.shared
+    
+    // MARK: - Singleton
+    static let shared = LearningNuggetService()
     
     private init() {}
+    
+    // MARK: - Public Methods
+    
+    /// Generiert einen Lerninhalt basierend auf dem Journaleintrag
+    /// - Parameter journalEntry: Der Journaleintrag, aus dem der Lerninhalt generiert werden soll
+    /// - Returns: Ein Publisher, der den generierten Lerninhalt liefert
+    func generateLearningNugget(from journalEntry: JournalEntry) async throws -> LearningNugget {
+        // Bestimme den aktuellen Provider
+        let currentProvider = LLMProvider.current
+        
+        // Erstelle den Prompt basierend auf dem Journaleintrag
+        let prompt = createPrompt(from: journalEntry)
+        
+        // Wähle den entsprechenden Service basierend auf dem Provider
+        switch currentProvider {
+        case .openAI:
+            return try await openAIService.generateLearningNugget(from: prompt)
+        case .deepSeek:
+            return try await deepSeekService.generateLearningNugget(from: prompt)
+        }
+    }
     
     private let systemPromptTemplate = """
     Du bist ein spezialisierter Wissensassistent innerhalb der App Eunoia. Deine einzige Aufgabe ist es, täglich ein einzigartiges und prägnantes Learning Nugget aus der vom Nutzer gewählten Wissenskategorie {Kategorie} zu liefern.
@@ -37,7 +63,17 @@ class LearningNuggetService {
         \(systemPromptTemplate)
         """
         
-        let content = try await openAIService.generateText(prompt: prompt)
+        // Bestimme den aktuellen Provider
+        let currentProvider = LLMProvider.current
+        
+        // Verwende den konfigurierten LLM-Dienst
+        let content: String
+        switch currentProvider {
+        case .openAI:
+            content = try await openAIService.generateText(prompt: prompt)
+        case .deepSeek:
+            content = try await deepSeekService.generateText(prompt: prompt)
+        }
         
         // Create and save the nugget
         let nugget = LearningNugget(
@@ -108,5 +144,33 @@ class LearningNuggetService {
                 return "Die Antwort konnte nicht verarbeitet werden. Bitte versuche es erneut."
             }
         }
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Erstellt einen Prompt für die KI basierend auf dem Journaleintrag
+    /// - Parameter journalEntry: Der Journaleintrag, aus dem der Prompt erstellt werden soll
+    /// - Returns: Der erstellte Prompt
+    private func createPrompt(from journalEntry: JournalEntry) -> String {
+        var promptParts: [String] = []
+        
+        promptParts.append("Basierend auf dem folgenden Journaleintrag, erstelle eine kurze, prägnante Lernerkenntnis:")
+        
+        // Sicherer Zugriff auf optionale Strings
+        if !journalEntry.gratitude.isEmpty {
+            promptParts.append("Wofür ich dankbar bin: \(journalEntry.gratitude)")
+        }
+        
+        if !journalEntry.highlight.isEmpty {
+            promptParts.append("Highlight des Tages: \(journalEntry.highlight)")
+        }
+        
+        if !journalEntry.learning.isEmpty {
+            promptParts.append("Was ich gelernt habe: \(journalEntry.learning)")
+        }
+        
+        promptParts.append("Formuliere eine kurze, prägnante Lernerkenntnis (maximal 2 Sätze) im Format 'Inhalt: [Lernerkenntnis]'.")
+        
+        return promptParts.joined(separator: "\n\n")
     }
 } 

@@ -1,4 +1,5 @@
 import Foundation
+import FirebaseAuth
 
 enum OpenAIError: Error {
     case invalidResponse
@@ -169,9 +170,16 @@ actor OpenAIService {
         return try await generateText(prompt: prompt)
     }
     
-    func generateLearningNugget(category: String) async throws -> String {
+    func generateLearningNugget(category: String) async throws -> LearningNugget {
         let prompt = "Generiere einen kurzen, inspirierenden Lernimpuls zum Thema '\(category)'. Der Text sollte motivierend und zum Nachdenken anregend sein."
-        return try await generateText(prompt: prompt)
+        let content = try await generateText(prompt: prompt)
+        
+        return LearningNugget(
+            userId: Auth.auth().currentUser?.uid ?? "test",
+            category: .aiGenerated,
+            title: "Lernimpuls",
+            content: content
+        )
     }
     
     func parseResponse(_ jsonString: String) -> OpenAIResponse? {
@@ -196,11 +204,25 @@ actor OpenAIService {
         }
         
         return LearningNugget(
-            userId: AuthenticationService.shared.currentUser?.uid ?? "",
+            userId: Auth.auth().currentUser?.uid ?? "",
             category: .aiGenerated,
             title: title,
             content: content,
             isAddedToJournal: true
+        )
+    }
+    
+    /// Generiert einen Lerninhalt basierend auf dem übergebenen Prompt
+    /// - Parameter prompt: Der Prompt für die Textgenerierung
+    /// - Returns: Der generierte Lerninhalt als LearningNugget
+    func generateLearningNugget(from prompt: String) async throws -> LearningNugget {
+        let content = try await generateText(prompt: prompt)
+        
+        return LearningNugget(
+            userId: Auth.auth().currentUser?.uid ?? "test",
+            category: .aiGenerated,
+            title: "Lernimpuls",
+            content: content
         )
     }
 } 
