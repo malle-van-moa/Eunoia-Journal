@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import FirebaseAuth
+import UIKit
 
 class VisionBoardViewModel: ObservableObject {
     @Published var visionBoard: VisionBoard?
@@ -17,6 +18,7 @@ class VisionBoardViewModel: ObservableObject {
         case goals = "Lebensziele"
         case lifestyle = "Traumlebensstil"
         case personality = "Ideales Selbst"
+        case valueCompass = "Wertekompass"
         
         var description: String {
             switch self {
@@ -28,12 +30,40 @@ class VisionBoardViewModel: ObservableObject {
                 return "Visualisiere deinen idealen Lebensstil"
             case .personality:
                 return "Definiere die Person, die du werden möchtest"
+            case .valueCompass:
+                return "Erstelle deinen persönlichen Wertekompass"
             }
         }
     }
     
     init() {
         setupSubscriptions()
+        setupNotificationObservers()
+    }
+    
+    private func setupNotificationObservers() {
+        // Beobachte App-Lebenszyklus-Benachrichtigungen
+        NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+            .sink { [weak self] _ in
+                // App geht in den Hintergrund, entferne Subscriptions
+                self?.cancellables.removeAll()
+                print("🔄 VisionBoardViewModel: Firestore-Subscriptions entfernt")
+            }
+            .store(in: &cancellables)
+        
+        // Beobachte die RefreshFirestoreSubscriptions-Benachrichtigung
+        NotificationCenter.default.publisher(for: NSNotification.Name("RefreshFirestoreSubscriptions"))
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                // Stelle sicher, dass wir einen authentifizierten Benutzer haben
+                if let userId = Auth.auth().currentUser?.uid {
+                    print("🔄 VisionBoardViewModel: Baue Firestore-Subscriptions neu auf")
+                    self.setupSubscriptions()
+                    self.loadVisionBoard()
+                }
+            }
+            .store(in: &cancellables)
     }
     
     private func setupSubscriptions() {
@@ -76,7 +106,7 @@ class VisionBoardViewModel: ObservableObject {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
         let newBoard = VisionBoard(
-            id: UUID().uuidString,
+            id: nil,
             userId: userId,
             lastModified: Date(),
             personalValues: [],
@@ -97,7 +127,8 @@ class VisionBoardViewModel: ObservableObject {
                 habits: "",
                 growth: ""
             ),
-            syncStatus: .pendingUpload
+            syncStatus: .pendingUpload,
+            valueCompass: nil
         )
         
         visionBoard = newBoard
@@ -153,6 +184,15 @@ class VisionBoardViewModel: ObservableObject {
         saveVisionBoard(board)
     }
     
+    func updateValueCompass(_ values: [RadarChartEntry]) {
+        guard var board = visionBoard else { return }
+        let compass = ValueCompass(values: values)
+        board.valueCompass = compass
+        board.lastModified = Date()
+        board.syncStatus = .pendingUpload
+        saveVisionBoard(board)
+    }
+    
     // MARK: - Guided Exercises
     
     func startExercise(_ exercise: GuidedExercise) {
@@ -171,12 +211,13 @@ class VisionBoardViewModel: ObservableObject {
         guard let board = visionBoard else { return 0.0 }
         
         var progress = 0.0
-        let totalSteps = 4.0 // Total number of main sections
+        let totalSteps = 5.0 // Total number of main sections including valueCompass
         
         if !board.personalValues.isEmpty { progress += 1.0 }
         if !board.goals.isEmpty { progress += 1.0 }
         if !board.lifestyleVision.isEmpty { progress += 1.0 }
         if !board.desiredPersonality.isEmpty { progress += 1.0 }
+        if board.valueCompass != nil { progress += 1.0 }
         
         return progress / totalSteps
     }

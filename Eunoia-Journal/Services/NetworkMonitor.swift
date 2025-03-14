@@ -3,33 +3,34 @@ import Network
 import Combine
 
 class NetworkMonitor: ObservableObject {
-    static let shared = NetworkMonitor()
+    @Published var isConnected: Bool = false
+    @Published var connectionType: NWInterface.InterfaceType?
+    
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "NetworkMonitor")
-    
-    @Published private(set) var isConnected = true
-    private var connectionType: NWInterface.InterfaceType?
     private var completionHandler: ((Bool) -> Void)?
     
-    private init() {
-        startMonitoring()
-    }
+    static let shared = NetworkMonitor()
+    
+    private init() {}
     
     func startMonitoring(completion: ((Bool) -> Void)? = nil) {
         completionHandler = completion
         
+        // Stoppe vorherige Überwachung, um sicherzustellen, dass keine doppelten Verbindungen bestehen
+        stopMonitoring()
+        
         monitor.pathUpdateHandler = { [weak self] path in
-            self?.isConnected = path.status == .satisfied
-            self?.connectionType = self?.checkConnectionType(path: path)
+            guard let self = self else { return }
             
-            if let completionHandler = self?.completionHandler {
-                DispatchQueue.main.async {
-                    completionHandler(path.status == .satisfied)
-                }
+            DispatchQueue.main.async {
+                self.isConnected = path.status == .satisfied
+                self.connectionType = self.getConnectionType(path: path)
+                self.completionHandler?(self.isConnected)
             }
             
             #if DEBUG
-            self?.logNetworkStatus(path: path)
+            self.logNetworkStatus(path: path)
             #endif
         }
         
@@ -60,29 +61,51 @@ class NetworkMonitor: ObservableObject {
         case .loopback:
             return "Loopback"
         default:
-            return "Unknown"
+            return "Other"
         }
     }
     
-    private func checkConnectionType(path: NWPath) -> NWInterface.InterfaceType? {
+    private func getConnectionType(path: NWPath) -> NWInterface.InterfaceType? {
         if path.usesInterfaceType(.wifi) {
             return .wifi
         } else if path.usesInterfaceType(.cellular) {
             return .cellular
         } else if path.usesInterfaceType(.wiredEthernet) {
             return .wiredEthernet
-        } else {
-            return nil
+        } else if path.usesInterfaceType(.loopback) {
+            return .loopback
         }
+        
+        return nil
     }
     
     #if DEBUG
     private func logNetworkStatus(path: NWPath) {
-        print("Network Status Changed:")
-        print("Connected: \(isConnected)")
-        print("Connection Type: \(networkType)")
-        print("Interface Types: \(path.availableInterfaces.map { $0.type })")
-        print("Path Status: \(path.status)")
+        print("Network Status: \(path.status)")
+        print("Network Type: \(networkType)")
+        print("Is Expensive: \(path.isExpensive)")
+        print("Interfaces: \(path.availableInterfaces.map { $0.name })")
     }
     #endif
+    
+    // Hilfsmethode, um zu prüfen, ob eine Netzwerkverbindung sicher hergestellt werden kann
+    func ensureNetworkConnection() -> Bool {
+        return isNetworkAvailable
+    }
+    
+    // Hilfsmethode, um auf eine Netzwerkverbindung zu warten
+    func waitForConnection(timeout: TimeInterval = 30.0) -> AnyPublisher<Bool, Never> {
+        // Wenn bereits verbunden, sofort true zurückgeben
+        if isNetworkAvailable {
+            return Just(true).eraseToAnyPublisher()
+        }
+        
+        // Auf Verbindung warten mit Timeout
+        return $isConnected
+            .filter { $0 }
+            .first()
+            .timeout(.seconds(timeout), scheduler: RunLoop.main)
+            .replaceError(with: false)
+            .eraseToAnyPublisher()
+    }
 } 

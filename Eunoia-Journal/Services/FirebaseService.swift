@@ -6,6 +6,8 @@ import Combine
 import AuthenticationServices
 import GoogleSignIn
 import CryptoKit
+import CoreData
+import UIKit
 
 class FirebaseService {
     static let shared = FirebaseService()
@@ -16,6 +18,9 @@ class FirebaseService {
     private let coreDataManager = CoreDataManager.shared
     private let db: Firestore
     private let networkMonitor = NetworkMonitor.shared
+    
+    private var cancellables = Set<AnyCancellable>()
+    private var appStateObservers = Set<AnyCancellable>()
     
     private init() {
         // Konfiguriere Firestore
@@ -31,6 +36,7 @@ class FirebaseService {
         self.db = db
         
         setupNetworkMonitoring()
+        setupAppStateObservers()
         
         #if DEBUG
         print("Firestore konfiguriert mit Persistence und \(cacheSize / 1024 / 1024) MB Cache")
@@ -38,10 +44,77 @@ class FirebaseService {
     }
     
     private func setupNetworkMonitoring() {
+        // Stoppe vorherige Überwachung, um sicherzustellen, dass keine doppelten Verbindungen bestehen
+        networkMonitor.stopMonitoring()
+        
+        // Starte Netzwerküberwachung mit verbesserter Fehlerbehandlung
         networkMonitor.startMonitoring { [weak self] isConnected in
+            guard let self = self else { return }
+            
             if isConnected {
-                self?.syncLocalData()
+                // Wenn Verbindung hergestellt wurde, synchronisiere lokale Daten
+                self.syncLocalData()
+            } else {
+                // Wenn Verbindung verloren wurde, logge dies
+                print("⚠️ Netzwerkverbindung verloren. Offline-Modus aktiviert.")
             }
+        }
+    }
+    
+    private func setupAppStateObservers() {
+        // Entferne bestehende Observer
+        appStateObservers.removeAll()
+        
+        // Beobachte App-Zustandsänderungen
+        NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+            .sink { [weak self] _ in
+                self?.handleAppBackgrounding()
+            }
+            .store(in: &appStateObservers)
+        
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                self?.handleAppForegrounding()
+            }
+            .store(in: &appStateObservers)
+    }
+    
+    private func handleAppBackgrounding() {
+        print("📱 App wechselt in den Hintergrund - Pausiere Firestore-Streams")
+        
+        // Statt die Firestore-Einstellungen zu ändern, entfernen wir alle aktiven Listener
+        // und speichern den aktuellen Zustand, falls nötig
+        
+        // Speichere ausstehende Änderungen
+        if let userId = Auth.auth().currentUser?.uid {
+            Task {
+                do {
+                    // Prüfe, ob ausstehende Änderungen vorhanden sind
+                    let pendingEntries = try coreDataManager.fetchPendingEntries(for: userId)
+                    if !pendingEntries.isEmpty {
+                        print("📝 \(pendingEntries.count) ausstehende Einträge gespeichert für spätere Synchronisation")
+                    }
+                } catch {
+                    print("⚠️ Fehler beim Prüfen auf ausstehende Änderungen: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        // Wir setzen keine Firestore-Einstellungen mehr, da dies nach der Initialisierung nicht erlaubt ist
+    }
+    
+    private func handleAppForegrounding() {
+        print("📱 App kehrt in den Vordergrund zurück - Stelle Firestore-Streams wieder her")
+        
+        // Überprüfe Netzwerkverbindung und synchronisiere bei Bedarf
+        if networkMonitor.isNetworkAvailable {
+            syncLocalData()
+        }
+        
+        // Stelle sicher, dass die Subscriptions neu aufgebaut werden
+        if let userId = Auth.auth().currentUser?.uid {
+            // Benachrichtige die ViewModels, dass sie ihre Subscriptions neu aufbauen sollen
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshFirestoreSubscriptions"), object: nil)
         }
     }
     
@@ -49,8 +122,16 @@ class FirebaseService {
     
     private func ensureNetworkConnection() throws {
         guard networkMonitor.isNetworkAvailable else {
+            print("⚠️ Keine Netzwerkverbindung verfügbar. Operation wird in den Offline-Modus verschoben.")
             throw NetworkError.noConnection
         }
+    }
+    
+    /// Wartet auf eine Netzwerkverbindung mit Timeout
+    /// - Parameter timeout: Timeout in Sekunden
+    /// - Returns: Publisher, der true zurückgibt, wenn eine Verbindung hergestellt wurde
+    private func waitForNetworkConnection(timeout: TimeInterval = 10.0) -> AnyPublisher<Bool, Never> {
+        return networkMonitor.waitForConnection(timeout: timeout)
     }
     
     // MARK: - Authentication
@@ -98,7 +179,35 @@ class FirebaseService {
     }
     
     func observeJournalEntries(for userId: String) -> AnyPublisher<[JournalEntry], Error> {
-        journalService.observeJournalEntries(for: userId)
+        // Prüfe zuerst, ob eine Netzwerkverbindung verfügbar ist
+        if !networkMonitor.isNetworkAvailable {
+            print("⚠️ Keine Netzwerkverbindung verfügbar. Verwende lokale Daten.")
+            
+            // Versuche, lokale Daten aus CoreData zu laden
+            do {
+                let localEntries = try coreDataManager.fetchJournalEntries(for: userId)
+                return Just(localEntries)
+                    .setFailureType(to: Error.self)
+                    .eraseToAnyPublisher()
+            } catch {
+                print("⚠️ Fehler beim Laden lokaler Daten: \(error.localizedDescription)")
+            }
+            
+            // Warte auf Netzwerkverbindung und versuche dann erneut
+            return waitForNetworkConnection()
+                .filter { $0 }
+                .flatMap { [weak self] _ -> AnyPublisher<[JournalEntry], Error> in
+                    guard let self = self else {
+                        return Fail(error: NSError(domain: "FirebaseService", code: -1, userInfo: [NSLocalizedDescriptionKey: "FirebaseService wurde freigegeben"]))
+                            .eraseToAnyPublisher()
+                    }
+                    return self.journalService.observeJournalEntries(for: userId)
+                }
+                .eraseToAnyPublisher()
+        }
+        
+        // Wenn Netzwerkverbindung verfügbar ist, verwende den normalen Pfad
+        return journalService.observeJournalEntries(for: userId)
     }
     
     // MARK: - Vision Board
@@ -122,6 +231,12 @@ class FirebaseService {
         
         Task {
             do {
+                // Prüfe zuerst, ob eine Netzwerkverbindung verfügbar ist
+                guard networkMonitor.isNetworkAvailable else {
+                    print("⚠️ Keine Netzwerkverbindung verfügbar. Synchronisation wird verschoben.")
+                    return
+                }
+                
                 // Sync journal entries
                 let pendingEntries = try coreDataManager.fetchPendingEntries(for: userId)
                 for entry in pendingEntries {

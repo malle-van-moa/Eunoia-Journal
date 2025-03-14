@@ -2,6 +2,18 @@ import Foundation
 import FirebaseCore
 import FirebaseFirestore
 
+// Wertekompass-Modell mit direkter Definition
+struct ValueCompass: Identifiable, Codable {
+    var id: String = UUID().uuidString
+    var values: [RadarChartEntry]
+    var lastUpdated: Date
+    
+    init(values: [RadarChartEntry], lastUpdated: Date = Date()) {
+        self.values = values
+        self.lastUpdated = lastUpdated
+    }
+}
+
 struct VisionBoard: Identifiable, Codable {
     @DocumentID var id: String?
     var userId: String
@@ -11,6 +23,29 @@ struct VisionBoard: Identifiable, Codable {
     var lifestyleVision: LifestyleVision
     var desiredPersonality: DesiredPersonality
     var syncStatus: SyncStatus
+    var valueCompass: ValueCompass?
+    
+    init(
+        id: String? = nil,
+        userId: String,
+        lastModified: Date,
+        personalValues: [PersonalValue],
+        goals: [Goal],
+        lifestyleVision: LifestyleVision,
+        desiredPersonality: DesiredPersonality,
+        syncStatus: SyncStatus,
+        valueCompass: ValueCompass? = nil
+    ) {
+        self.id = id
+        self.userId = userId
+        self.lastModified = lastModified
+        self.personalValues = personalValues
+        self.goals = goals
+        self.lifestyleVision = lifestyleVision
+        self.desiredPersonality = desiredPersonality
+        self.syncStatus = syncStatus
+        self.valueCompass = valueCompass
+    }
 }
 
 struct PersonalValue: Identifiable, Codable {
@@ -211,5 +246,8 @@ extension VisionBoard {
             habits: entity.personalityHabits ?? "",
             growth: entity.personalityGrowth ?? ""
         )
+        
+        // ValueCompass wird später implementiert
+        self.valueCompass = nil
     }
 } 

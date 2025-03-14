@@ -29,6 +29,32 @@ class JournalViewModel: ObservableObject {
     init() {
         loadJournalEntries() // Load entries immediately
         setupAuthSubscription()
+        setupNotificationObservers()
+    }
+    
+    private func setupNotificationObservers() {
+        // Beobachte App-Lebenszyklus-Benachrichtigungen
+        NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+            .sink { [weak self] _ in
+                // App geht in den Hintergrund, entferne Subscriptions
+                self?.cancellables.removeAll()
+                print("🔄 JournalViewModel: Firestore-Subscriptions entfernt")
+            }
+            .store(in: &cancellables)
+        
+        // Beobachte die RefreshFirestoreSubscriptions-Benachrichtigung
+        NotificationCenter.default.publisher(for: NSNotification.Name("RefreshFirestoreSubscriptions"))
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                // Stelle sicher, dass wir einen authentifizierten Benutzer haben
+                if let userId = Auth.auth().currentUser?.uid {
+                    print("🔄 JournalViewModel: Baue Firestore-Subscriptions neu auf")
+                    self.setupSubscriptions(for: userId)
+                    self.loadJournalEntries()
+                }
+            }
+            .store(in: &cancellables)
     }
     
     private func setupAuthSubscription() {
@@ -54,6 +80,44 @@ class JournalViewModel: ObservableObject {
         // Cancel existing subscriptions
         cancellables.removeAll()
         
+        // Prüfe, ob eine Netzwerkverbindung verfügbar ist
+        if !NetworkMonitor.shared.isNetworkAvailable {
+            // Lade lokale Daten aus CoreData, wenn keine Netzwerkverbindung verfügbar ist
+            loadLocalJournalEntries(for: userId)
+            
+            // Überwache Netzwerkverbindung und aktualisiere Daten, wenn Verbindung hergestellt wird
+            NetworkMonitor.shared.$isConnected
+                .filter { $0 }
+                .first()
+                .sink { [weak self] _ in
+                    self?.setupFirestoreSubscription(for: userId)
+                }
+                .store(in: &cancellables)
+            
+            return
+        }
+        
+        // Wenn Netzwerkverbindung verfügbar ist, verwende Firestore
+        setupFirestoreSubscription(for: userId)
+    }
+    
+    private func loadLocalJournalEntries(for userId: String) {
+        Task {
+            do {
+                let entries = try await coreDataManager.fetchJournalEntries(for: userId)
+                DispatchQueue.main.async {
+                    self.journalEntries = entries
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.error = error
+                    self.logger.error("Failed to load local journal entries: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func setupFirestoreSubscription(for userId: String) {
         // Subscribe to real-time journal entry updates with retry logic
         firebaseService.observeJournalEntries(for: userId)
             .retry(3) // Retry up to 3 times on failure
@@ -63,27 +127,13 @@ class JournalViewModel: ObservableObject {
                 if case .failure(let error) = completion {
                     self.logger.error("Failed to observe journal entries: \(error.localizedDescription)")
                     self.error = error
+                    
+                    // Wenn Fehler auftritt, versuche lokale Daten zu laden
+                    self.loadLocalJournalEntries(for: userId)
                 }
             } receiveValue: { [weak self] entries in
                 guard let self = self else { return }
                 self.journalEntries = entries
-            }
-            .store(in: &cancellables)
-            
-        // Subscribe to network status changes
-        NetworkMonitor.shared.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                if NetworkMonitor.shared.isConnected {
-                    Task {
-                        do {
-                            try await self?.syncPendingEntries()
-                        } catch {
-                            self?.logger.error("Failed to sync pending entries: \(error.localizedDescription)")
-                            self?.error = error
-                        }
-                    }
-                }
             }
             .store(in: &cancellables)
     }

@@ -1,5 +1,17 @@
 import SwiftUI
 
+// Generische Datenstruktur für den RadarChart
+struct RadarChartEntry: Identifiable, Codable {
+    var id: String { name }
+    let name: String
+    let importance: Int
+    let satisfaction: Int
+    
+    var gap: Int {
+        return importance - satisfaction
+    }
+}
+
 // MARK: - Radar Chart Components
 
 // Hilfsfunktionen und -strukturen
@@ -19,7 +31,7 @@ struct RadarChartAxisPoint {
 
 // Hintergrund-Komponente
 struct RadarChartBackground: View {
-    let values: [CompassValue]
+    let values: [RadarChartEntry]
     let maxValue: Int
     let geometry: GeometryProxy
     
@@ -254,7 +266,7 @@ struct BackgroundCircle: View {
 
 // Daten-Komponente
 struct RadarChartDataLayer: View {
-    let values: [CompassValue]
+    let values: [RadarChartEntry]
     let maxValue: Int
     let geometry: GeometryProxy
     let isImportance: Bool
@@ -352,34 +364,33 @@ struct RadarChartLegend: View {
         HStack(spacing: 20) {
             // Wichtigkeit (blau)
             HStack(spacing: 8) {
-                Rectangle()
+                Circle()
                     .fill(Color.blue)
-                    .frame(width: 15, height: 15)
+                    .frame(width: 10, height: 10)
                 Text("Wichtigkeit")
                     .font(.caption)
-                    .foregroundColor(.primary) // Primäre Textfarbe statt weiß
+                    .foregroundColor(.primary)
             }
             
             // Zufriedenheit (grün)
             HStack(spacing: 8) {
-                Rectangle()
+                Circle()
                     .fill(Color.green)
-                    .frame(width: 15, height: 15)
+                    .frame(width: 10, height: 10)
                 Text("Zufriedenheit")
                     .font(.caption)
-                    .foregroundColor(.primary) // Primäre Textfarbe statt weiß
+                    .foregroundColor(.primary)
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 16)
-        .background(Color(.systemBackground)) // Systemhintergrund statt schwarz
-        .cornerRadius(8)
+        // Hintergrund entfernt, um den grauen Hintergrund durchscheinen zu lassen
     }
 }
 
 // MARK: - Radar Chart View
 struct RadarChartView: View {
-    let values: [CompassValue]
+    let values: [RadarChartEntry]
     let maxValue: Int = 10
     
     var body: some View {

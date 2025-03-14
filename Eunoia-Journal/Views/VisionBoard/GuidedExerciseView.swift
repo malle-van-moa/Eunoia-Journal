@@ -36,6 +36,22 @@ struct GuidedExerciseView: View {
     @State private var habits = ""
     @State private var growth = ""
     
+    // Value Compass
+    @State private var compassValues: [RadarChartEntry] = []
+    @State private var currentValueName = ""
+    @State private var currentValueImportance = 5
+    @State private var currentValueSatisfaction = 5
+    
+    // Status für die Anzeige des benutzerdefinierten Wert-Formulars
+    @State private var showCustomValueForm = false
+    
+    // Aktiv bearbeiteter Wert
+    @State private var editingValueName: String? = nil
+    
+    // Temporäre Werte für die Bearbeitung
+    @State private var tempImportance: Int = 5
+    @State private var tempSatisfaction: Int = 5
+    
     var body: some View {
         VStack {
             // Progress Bar
@@ -82,6 +98,14 @@ struct GuidedExerciseView: View {
                             skills: $skills,
                             habits: $habits,
                             growth: $growth
+                        )
+                    case .valueCompass:
+                        ValueCompassExercise(
+                            step: currentStep,
+                            compassValues: $compassValues,
+                            currentValueName: $currentValueName,
+                            currentValueImportance: $currentValueImportance,
+                            currentValueSatisfaction: $currentValueSatisfaction
                         )
                     }
                 }
@@ -134,6 +158,7 @@ struct GuidedExerciseView: View {
         case .goals: return 5
         case .lifestyle: return 5
         case .personality: return 4
+        case .valueCompass: return 4
         }
     }
     
@@ -169,6 +194,13 @@ struct GuidedExerciseView: View {
             case 2: return !behaviors.isEmpty
             case 3: return !skills.isEmpty
             default: return !habits.isEmpty
+            }
+        case .valueCompass:
+            switch currentStep {
+            case 0: return true // Einführungsschritt
+            case 1: return compassValues.count >= 3 || showCustomValueForm // Mindestens 3 Werte erforderlich oder Formular geöffnet
+            case 2: return compassValues.count >= 3 // Mindestens 3 Werte erforderlich
+            default: return true
             }
         }
     }
@@ -214,6 +246,9 @@ struct GuidedExerciseView: View {
                 growth: growth
             )
             viewModel.updateDesiredPersonality(personality)
+            
+        case .valueCompass:
+            viewModel.updateValueCompass(compassValues)
         }
         
         viewModel.completeExercise()
@@ -532,6 +567,451 @@ struct PersonalityExercise: View {
                     .padding(4)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
+                
+            default:
+                EmptyView()
+            }
+        }
+    }
+}
+
+// ValueCompassExercise
+struct ValueCompassExercise: View {
+    let step: Int
+    @Binding var compassValues: [RadarChartEntry]
+    @Binding var currentValueName: String
+    @Binding var currentValueImportance: Int
+    @Binding var currentValueSatisfaction: Int
+    
+    // Vordefinierte Werte für den Wertekompass
+    private let predefinedValues = [
+        "Gesundheit und Wohlbefinden",
+        "Familie und Beziehungen",
+        "Freundschaft und soziale Kontakte",
+        "Karriere und berufliche Erfüllung",
+        "Finanzielle Sicherheit",
+        "Persönliches Wachstum und Lernen",
+        "Freiheit und Unabhängigkeit",
+        "Kreativität und Selbstausdruck",
+        "Spaß und Lebensfreude",
+        "Spiritualität oder Sinnhaftigkeit",
+        "Altruismus und soziales Engagement"
+    ]
+    
+    // Status für die Anzeige des benutzerdefinierten Wert-Formulars
+    @State private var showCustomValueForm = false
+    
+    // Aktiv bearbeiteter Wert
+    @State private var editingValueName: String? = nil
+    
+    // Temporäre Werte für die Bearbeitung
+    @State private var tempImportance: Int = 5
+    @State private var tempSatisfaction: Int = 5
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            switch step {
+            case 0:
+                ExercisePrompt(
+                    title: "Einführung zum Wertekompass",
+                    description: "Der Wertekompass hilft dir, deine wichtigsten Werte zu identifizieren und zu visualisieren, wie zufrieden du mit ihrer Umsetzung in deinem Leben bist.",
+                    example: "Bewerte jeden Wert nach seiner Wichtigkeit (1-10) und deiner aktuellen Zufriedenheit (1-10). Die Differenz zeigt dir, wo Handlungsbedarf besteht."
+                )
+                
+                Text("So gehst du vor:")
+                    .font(.headline)
+                    .padding(.top, 10)
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("1. Wähle mindestens 3 Werte aus oder füge eigene hinzu (max. 8)")
+                    Text("2. Bewerte jeden Wert nach Wichtigkeit (1-10)")
+                    Text("3. Bewerte deine aktuelle Zufriedenheit (1-10)")
+                    Text("4. Betrachte das Ergebnis und identifiziere Handlungsbedarf")
+                }
+                .padding(.leading)
+                
+            case 1:
+                ExercisePrompt(
+                    title: "Werte auswählen",
+                    description: "Wähle wichtige Werte für deinen Kompass aus oder füge eigene hinzu. Du brauchst mindestens 3 Werte.",
+                    example: ""
+                )
+                
+                // Liste der vordefinierten Werte
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 15) {
+                        ForEach(predefinedValues, id: \.self) { value in
+                            // Prüfen, ob der Wert bereits hinzugefügt wurde
+                            let isSelected = compassValues.contains(where: { $0.name == value })
+                            let isEditing = editingValueName == value
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                Button(action: {
+                                    if isSelected {
+                                        if isEditing {
+                                            // Bearbeitung beenden
+                                            editingValueName = nil
+                                        } else {
+                                            // Bearbeitung starten
+                                            editingValueName = value
+                                            if let index = compassValues.firstIndex(where: { $0.name == value }) {
+                                                let entry = compassValues[index]
+                                                tempImportance = entry.importance
+                                                tempSatisfaction = entry.satisfaction
+                                            }
+                                        }
+                                    } else {
+                                        // Wert hinzufügen mit Standardwerten
+                                        let newValue = RadarChartEntry(
+                                            name: value,
+                                            importance: 5,
+                                            satisfaction: 5
+                                        )
+                                        compassValues.append(newValue)
+                                        
+                                        // Direkt in Bearbeitungsmodus wechseln
+                                        editingValueName = value
+                                        tempImportance = 5
+                                        tempSatisfaction = 5
+                                    }
+                                }) {
+                                    HStack {
+                                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                                            .foregroundColor(isSelected ? .purple : .gray)
+                                        
+                                        Text(value)
+                                            .fontWeight(isSelected ? .bold : .regular)
+                                            .foregroundColor(isSelected ? .primary : .primary)
+                                        
+                                        Spacer()
+                                        
+                                        if isSelected && !isEditing {
+                                            // Zeige die aktuellen Werte an
+                                            if let selectedValue = compassValues.first(where: { $0.name == value }) {
+                                                HStack(spacing: 12) {
+                                                    Text("W: \(selectedValue.importance)")
+                                                        .foregroundColor(.blue)
+                                                        .font(.caption)
+                                                        .bold()
+                                                    
+                                                    Text("Z: \(selectedValue.satisfaction)")
+                                                        .foregroundColor(.green)
+                                                        .font(.caption)
+                                                        .bold()
+                                                }
+                                            }
+                                            
+                                            // Löschen-Button
+                                            Button(action: {
+                                                compassValues.removeAll(where: { $0.name == value })
+                                                if editingValueName == value {
+                                                    editingValueName = nil
+                                                }
+                                            }) {
+                                                Image(systemName: "trash")
+                                                    .foregroundColor(.red)
+                                                    .font(.caption)
+                                            }
+                                            .padding(.leading, 8)
+                                        }
+                                    }
+                                    .padding(.vertical, 8)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                // Bearbeitungsbereich, wenn dieser Wert bearbeitet wird
+                                if isEditing {
+                                    VStack(spacing: 12) {
+                                        // Wichtigkeit-Slider
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack {
+                                                Text("Wichtigkeit:")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.blue)
+                                                
+                                                Spacer()
+                                                
+                                                Text("\(tempImportance)")
+                                                    .font(.subheadline)
+                                                    .fontWeight(.bold)
+                                                    .foregroundColor(.blue)
+                                                    .frame(width: 30, alignment: .trailing)
+                                            }
+                                            
+                                            Slider(value: Binding(
+                                                get: { Double(tempImportance) },
+                                                set: { tempImportance = Int($0) }
+                                            ), in: 1...10, step: 1)
+                                            .accentColor(.blue)
+                                        }
+                                        
+                                        // Zufriedenheit-Slider
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack {
+                                                Text("Zufriedenheit:")
+                                                    .font(.subheadline)
+                                                    .foregroundColor(.green)
+                                                
+                                                Spacer()
+                                                
+                                                Text("\(tempSatisfaction)")
+                                                    .font(.subheadline)
+                                                    .fontWeight(.bold)
+                                                    .foregroundColor(.green)
+                                                    .frame(width: 30, alignment: .trailing)
+                                            }
+                                            
+                                            Slider(value: Binding(
+                                                get: { Double(tempSatisfaction) },
+                                                set: { tempSatisfaction = Int($0) }
+                                            ), in: 1...10, step: 1)
+                                            .accentColor(.green)
+                                        }
+                                        
+                                        // Speichern-Button
+                                        HStack {
+                                            Spacer()
+                                            
+                                            Button(action: {
+                                                // Werte speichern
+                                                if let index = compassValues.firstIndex(where: { $0.name == value }) {
+                                                    compassValues[index] = RadarChartEntry(
+                                                        name: value,
+                                                        importance: tempImportance,
+                                                        satisfaction: tempSatisfaction
+                                                    )
+                                                }
+                                                
+                                                // Bearbeitungsmodus beenden
+                                                editingValueName = nil
+                                            }) {
+                                                Text("Speichern")
+                                                    .font(.subheadline)
+                                                    .fontWeight(.medium)
+                                                    .foregroundColor(.purple)
+                                                    .padding(.horizontal, 16)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color.purple.opacity(0.1))
+                                                    .cornerRadius(8)
+                                            }
+                                        }
+                                    }
+                                    .padding(.leading, 30)
+                                    .padding(.top, 4)
+                                    .padding(.bottom, 8)
+                                    .background(Color(.systemBackground).opacity(0.8))
+                                    .cornerRadius(8)
+                                    .transition(.opacity)
+                                }
+                            }
+                            
+                            Divider()
+                        }
+                        
+                        // Button zum Hinzufügen eines eigenen Wertes
+                        Button(action: {
+                            currentValueName = ""
+                            currentValueImportance = 5
+                            currentValueSatisfaction = 5
+                            showCustomValueForm = true
+                        }) {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.purple)
+                                Text("Eigenen Wert hinzufügen")
+                                    .foregroundColor(.purple)
+                            }
+                            .padding()
+                            .background(Color.purple.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                        .padding(.top, 10)
+                    }
+                    .padding(.bottom, 20)
+                }
+                
+                // Formular für benutzerdefinierte Werte
+                if showCustomValueForm {
+                    VStack(spacing: 15) {
+                        Text("Neuen Wert hinzufügen")
+                            .font(.headline)
+                            .padding(.top, 10)
+                        
+                        TextField("Name des Wertes", text: $currentValueName)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        
+                        // Wichtigkeit-Slider
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Wichtigkeit:")
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                                
+                                Spacer()
+                                
+                                Text("\(currentValueImportance)")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 30, alignment: .trailing)
+                            }
+                            
+                            Slider(value: Binding(
+                                get: { Double(currentValueImportance) },
+                                set: { currentValueImportance = Int($0) }
+                            ), in: 1...10, step: 1)
+                            .accentColor(.blue)
+                        }
+                        
+                        // Zufriedenheit-Slider
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Zufriedenheit:")
+                                    .font(.subheadline)
+                                    .foregroundColor(.green)
+                                
+                                Spacer()
+                                
+                                Text("\(currentValueSatisfaction)")
+                                    .font(.subheadline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                                    .frame(width: 30, alignment: .trailing)
+                            }
+                            
+                            Slider(value: Binding(
+                                get: { Double(currentValueSatisfaction) },
+                                set: { currentValueSatisfaction = Int($0) }
+                            ), in: 1...10, step: 1)
+                            .accentColor(.green)
+                        }
+                        
+                        HStack {
+                            Button(action: {
+                                showCustomValueForm = false
+                            }) {
+                                Text("Abbrechen")
+                                    .padding()
+                                    .background(Color.gray.opacity(0.2))
+                                    .cornerRadius(8)
+                            }
+                            
+                            Spacer()
+                            
+                            Button(action: {
+                                if !currentValueName.isEmpty {
+                                    // Neuen Wert hinzufügen
+                                    let newValue = RadarChartEntry(
+                                        name: currentValueName,
+                                        importance: currentValueImportance,
+                                        satisfaction: currentValueSatisfaction
+                                    )
+                                    compassValues.append(newValue)
+                                    
+                                    // Formular zurücksetzen und schließen
+                                    currentValueName = ""
+                                    currentValueImportance = 5
+                                    currentValueSatisfaction = 5
+                                    showCustomValueForm = false
+                                }
+                            }) {
+                                Text("Speichern")
+                                    .foregroundColor(.purple)
+                                    .padding()
+                                    .background(Color.purple.opacity(0.1))
+                                    .cornerRadius(8)
+                            }
+                            .disabled(currentValueName.isEmpty)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemBackground))
+                    .cornerRadius(10)
+                    .shadow(radius: 2)
+                    .padding(.vertical)
+                }
+                
+                // Anzeige der ausgewählten Werte
+                if !compassValues.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Ausgewählte Werte (\(compassValues.count)):")
+                            .font(.headline)
+                            .padding(.top, 10)
+                        
+                        Text("Du benötigst mindestens 3 Werte für deinen Wertekompass.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+            case 2:
+                ExercisePrompt(
+                    title: "Dein Wertekompass",
+                    description: "Hier ist die visuelle Darstellung deiner Werte.",
+                    example: ""
+                )
+                
+                if compassValues.count >= 3 {
+                    RadarChartView(values: compassValues)
+                        .padding(.vertical)
+                } else {
+                    Text("Bitte füge mindestens 3 Werte hinzu, um den Kompass anzuzeigen.")
+                        .foregroundColor(.orange)
+                        .padding()
+                }
+                
+                Text("Werte mit größter Differenz:")
+                    .font(.headline)
+                    .padding(.top, 10)
+                
+                let sortedValues = compassValues.sorted(by: { $0.gap > $1.gap })
+                let valuesToShow = sortedValues.prefix(3).filter { $0.gap > 0 }
+                
+                if valuesToShow.isEmpty {
+                    Text("Alle Werte sind im Gleichgewicht!")
+                        .foregroundColor(.green)
+                        .padding()
+                } else {
+                    ForEach(Array(valuesToShow.enumerated()), id: \.element.id) { index, value in
+                        HStack {
+                            Text("\(index + 1). \(value.name)")
+                                .fontWeight(.medium)
+                            Spacer()
+                            Text("Differenz: \(value.gap)")
+                                .foregroundColor(.orange)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                
+            case 3:
+                ExercisePrompt(
+                    title: "Reflexion",
+                    description: "Was sagt dir dein Wertekompass über dein Leben?",
+                    example: ""
+                )
+                
+                VStack(alignment: .leading, spacing: 15) {
+                    Text("Dein Wertekompass zeigt dir:")
+                        .font(.headline)
+                    
+                    Text("• Welche Werte dir besonders wichtig sind")
+                    Text("• Wie zufrieden du mit der Umsetzung dieser Werte bist")
+                    Text("• Wo die größten Differenzen zwischen Wichtigkeit und Zufriedenheit bestehen")
+                    
+                    Text("Handlungsempfehlungen:")
+                        .font(.headline)
+                        .padding(.top, 10)
+                    
+                    Text("• Konzentriere dich auf die Werte mit der größten Differenz")
+                    Text("• Überlege, welche konkreten Schritte du unternehmen kannst, um deine Zufriedenheit in diesen Bereichen zu erhöhen")
+                    Text("• Nutze deinen Wertekompass als Entscheidungshilfe im Alltag")
+                    
+                    if compassValues.count >= 3 {
+                        RadarChartView(values: compassValues)
+                            .padding(.vertical)
+                    }
+                }
                 
             default:
                 EmptyView()

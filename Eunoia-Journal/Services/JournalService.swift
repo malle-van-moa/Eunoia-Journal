@@ -220,18 +220,20 @@ class JournalService {
                     }
                     
                     // Handle optional learning nugget
-                    var learningNugget: LearningNugget?
+                    var learningNugget: LearningNugget? = nil
                     if let nuggetData = data["learningNugget"] as? [String: Any],
-                       let categoryRaw = nuggetData["category"] as? String,
-                       let category = LearningNugget.Category(rawValue: categoryRaw),
-                       let content = nuggetData["content"] as? String,
-                       let isAddedToJournal = nuggetData["isAddedToJournal"] as? Bool {
+                       let title = nuggetData["title"] as? String,
+                       let content = nuggetData["content"] as? String {
+                        // Extrahiere die Kategorie oder verwende einen Standardwert
+                        let categoryRaw = nuggetData["category"] as? String ?? LearningNugget.Category.aiGenerated.rawValue
+                        let category = LearningNugget.Category(rawValue: categoryRaw) ?? .aiGenerated
+                        
                         learningNugget = LearningNugget(
                             userId: userId,
                             category: category,
-                            title: "Lernimpuls",
+                            title: title,
                             content: content,
-                            isAddedToJournal: isAddedToJournal
+                            isAddedToJournal: nuggetData["isAddedToJournal"] as? Bool ?? true
                         )
                     }
                     
@@ -261,40 +263,54 @@ class JournalService {
                     
                     return try snapshot.documents.compactMap { document -> JournalEntry? in
                         let data = document.data()
+                        let documentId = document.documentID
                         
-                        // Extract timestamps
-                        guard let dateTimestamp = data["date"] as? Timestamp,
-                              let lastModifiedTimestamp = data["lastModified"] as? Timestamp,
-                              let userId = data["userId"] as? String,
-                              let gratitude = data["gratitude"] as? String,
-                              let highlight = data["highlight"] as? String,
-                              let learning = data["learning"] as? String,
-                              let syncStatusRaw = data["syncStatus"] as? String,
-                              let syncStatus = SyncStatus(rawValue: syncStatusRaw) else {
+                        // Extrahiere die erforderlichen Felder mit Fehlerbehandlung
+                        guard let dateTimestamp = data["date"] as? Timestamp else {
+                            print("⚠️ Fehlendes Datum in Dokument: \(documentId)")
                             return nil
                         }
                         
-                        // Handle optional learning nugget
-                        var learningNugget: LearningNugget?
+                        guard let userId = data["userId"] as? String else {
+                            print("⚠️ Fehlende userId in Dokument: \(documentId)")
+                            return nil
+                        }
+                        
+                        // Verwende Standardwerte für optionale Felder
+                        let gratitude = data["gratitude"] as? String ?? ""
+                        let highlight = data["highlight"] as? String ?? ""
+                        let learning = data["learning"] as? String ?? ""
+                        
+                        // Extrahiere den Sync-Status mit Standardwert
+                        let syncStatus = (data["syncStatus"] as? String).flatMap { SyncStatus(rawValue: $0) } ?? .synced
+                        
+                        // Extrahiere den Server-Timestamp
+                        let serverTimestamp = data["serverTimestamp"] as? Timestamp
+                        
+                        // Extrahiere den lastModified-Timestamp oder verwende das Datum
+                        let lastModifiedTimestamp = data["lastModified"] as? Timestamp ?? dateTimestamp
+                        
+                        // Extrahiere das Learning Nugget, falls vorhanden
+                        var learningNugget: LearningNugget? = nil
                         if let nuggetData = data["learningNugget"] as? [String: Any],
-                           let categoryRaw = nuggetData["category"] as? String,
-                           let category = LearningNugget.Category(rawValue: categoryRaw),
-                           let content = nuggetData["content"] as? String,
-                           let isAddedToJournal = nuggetData["isAddedToJournal"] as? Bool {
+                           let content = nuggetData["content"] as? String {
+                            // Extrahiere die Kategorie oder verwende einen Standardwert
+                            let categoryRaw = nuggetData["category"] as? String ?? LearningNugget.Category.aiGenerated.rawValue
+                            let category = LearningNugget.Category(rawValue: categoryRaw) ?? .aiGenerated
+                            let title = nuggetData["title"] as? String ?? "Lernimpuls"
+                            
                             learningNugget = LearningNugget(
                                 userId: userId,
                                 category: category,
-                                title: "Lernimpuls",
+                                title: title,
                                 content: content,
-                                isAddedToJournal: isAddedToJournal
+                                isAddedToJournal: nuggetData["isAddedToJournal"] as? Bool ?? true
                             )
                         }
                         
-                        // Handle server timestamp
-                        let serverTimestamp = data["serverTimestamp"] as? Timestamp
-                        
+                        // Erstelle den JournalEntry mit den extrahierten Daten
                         return JournalEntry(
-                            id: document.documentID,
+                            id: documentId,
                             userId: userId,
                             date: dateTimestamp.dateValue(),
                             gratitude: gratitude,
@@ -322,13 +338,54 @@ class JournalService {
     func observeJournalEntries(for userId: String) -> AnyPublisher<[JournalEntry], Error> {
         let subject = PassthroughSubject<[JournalEntry], Error>()
         
+        // Erstelle eine Referenz auf den Listener, um ihn später entfernen zu können
+        var listenerReference: ListenerRegistration?
+        
+        // Erstelle einen Listener, der automatisch entfernt wird, wenn das Subject abgebrochen wird
+        let cancellable = subject
+            .handleEvents(receiveCancel: {
+                // Entferne den Listener, wenn das Subject abgebrochen wird
+                listenerReference?.remove()
+                print("🔄 Firestore-Listener für Journal-Einträge wurde entfernt")
+            })
+            .eraseToAnyPublisher()
+        
+        // Erstelle die Firestore-Abfrage
         let query = db.collection("journalEntries")
             .whereField("userId", isEqualTo: userId)
         
-        query.addSnapshotListener { snapshot, error in
+        // Füge den Listener hinzu mit verbesserter Fehlerbehandlung
+        listenerReference = query.addSnapshotListener { [weak self] snapshot, error in
+            guard let self = self else { return }
+            
+            // Behandle Netzwerkfehler speziell
             if let error = error {
-                subject.send(completion: .failure(error))
-                return
+                let nsError = error as NSError
+                
+                // Prüfe, ob es sich um einen Netzwerkfehler handelt
+                if nsError.domain == "FIRFirestoreErrorDomain" && 
+                   (nsError.code == 8 || // Fehlercode für "Unavailable"
+                    nsError.localizedDescription.contains("Network connectivity changed")) {
+                    
+                    print("📡 Netzwerkverbindung unterbrochen. Firestore-Listener wird pausiert.")
+                    
+                    // Sende keine Fehlermeldung, da dies ein erwartetes Verhalten ist
+                    // Stattdessen versuchen wir, lokale Daten zu verwenden
+                    do {
+                        // Versuche, lokale Daten aus dem Cache zu laden
+                        let localEntries = try self.coreDataManager.fetchJournalEntries(for: userId)
+                        subject.send(localEntries)
+                    } catch {
+                        print("⚠️ Konnte keine lokalen Daten laden: \(error.localizedDescription)")
+                    }
+                    
+                    return
+                } else {
+                    // Bei anderen Fehlern senden wir den Fehler an den Subscriber
+                    print("❌ Firestore-Fehler: \(error.localizedDescription)")
+                    subject.send(completion: .failure(error))
+                    return
+                }
             }
             
             guard let documents = snapshot?.documents else {
@@ -339,40 +396,54 @@ class JournalService {
             do {
                 let entries = try documents.compactMap { document -> JournalEntry? in
                     let data = document.data()
+                    let documentId = document.documentID
                     
-                    // Extract timestamps
-                    guard let dateTimestamp = data["date"] as? Timestamp,
-                          let lastModifiedTimestamp = data["lastModified"] as? Timestamp,
-                          let userId = data["userId"] as? String,
-                          let gratitude = data["gratitude"] as? String,
-                          let highlight = data["highlight"] as? String,
-                          let learning = data["learning"] as? String,
-                          let syncStatusRaw = data["syncStatus"] as? String,
-                          let syncStatus = SyncStatus(rawValue: syncStatusRaw) else {
+                    // Extrahiere die erforderlichen Felder mit Fehlerbehandlung
+                    guard let dateTimestamp = data["date"] as? Timestamp else {
+                        print("⚠️ Fehlendes Datum in Dokument: \(documentId)")
                         return nil
                     }
                     
-                    // Handle optional learning nugget
-                    var learningNugget: LearningNugget?
+                    guard let userId = data["userId"] as? String else {
+                        print("⚠️ Fehlende userId in Dokument: \(documentId)")
+                        return nil
+                    }
+                    
+                    // Verwende Standardwerte für optionale Felder
+                    let gratitude = data["gratitude"] as? String ?? ""
+                    let highlight = data["highlight"] as? String ?? ""
+                    let learning = data["learning"] as? String ?? ""
+                    
+                    // Extrahiere den Sync-Status mit Standardwert
+                    let syncStatus = (data["syncStatus"] as? String).flatMap { SyncStatus(rawValue: $0) } ?? .synced
+                    
+                    // Extrahiere den Server-Timestamp
+                    let serverTimestamp = data["serverTimestamp"] as? Timestamp
+                    
+                    // Extrahiere den lastModified-Timestamp oder verwende das Datum
+                    let lastModifiedTimestamp = data["lastModified"] as? Timestamp ?? dateTimestamp
+                    
+                    // Extrahiere das Learning Nugget, falls vorhanden
+                    var learningNugget: LearningNugget? = nil
                     if let nuggetData = data["learningNugget"] as? [String: Any],
-                       let categoryRaw = nuggetData["category"] as? String,
-                       let category = LearningNugget.Category(rawValue: categoryRaw),
-                       let content = nuggetData["content"] as? String,
-                       let isAddedToJournal = nuggetData["isAddedToJournal"] as? Bool {
+                       let content = nuggetData["content"] as? String {
+                        // Extrahiere die Kategorie oder verwende einen Standardwert
+                        let categoryRaw = nuggetData["category"] as? String ?? LearningNugget.Category.aiGenerated.rawValue
+                        let category = LearningNugget.Category(rawValue: categoryRaw) ?? .aiGenerated
+                        let title = nuggetData["title"] as? String ?? "Lernimpuls"
+                        
                         learningNugget = LearningNugget(
                             userId: userId,
                             category: category,
-                            title: "Lernimpuls",
+                            title: title,
                             content: content,
-                            isAddedToJournal: isAddedToJournal
+                            isAddedToJournal: nuggetData["isAddedToJournal"] as? Bool ?? true
                         )
                     }
                     
-                    // Handle server timestamp
-                    let serverTimestamp = data["serverTimestamp"] as? Timestamp
-                    
+                    // Erstelle den JournalEntry mit den extrahierten Daten
                     return JournalEntry(
-                        id: document.documentID,
+                        id: documentId,
                         userId: userId,
                         date: dateTimestamp.dateValue(),
                         gratitude: gratitude,
@@ -387,11 +458,12 @@ class JournalService {
                 
                 subject.send(entries)
             } catch {
+                print("⚠️ Fehler beim Verarbeiten der Journal-Einträge: \(error.localizedDescription)")
                 subject.send(completion: .failure(error))
             }
         }
         
-        return subject.eraseToAnyPublisher()
+        return cancellable
     }
     
     #if canImport(JournalingSuggestions)
