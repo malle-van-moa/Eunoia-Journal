@@ -14,39 +14,6 @@ import PhotosUI
 // Definiere StorageHandle als Typealias
 typealias StorageHandle = Int
 
-// MARK: - Error Types
-enum StorageError: LocalizedError {
-    case invalidImage
-    case compressionFailed
-    case uploadFailed(String)
-    case downloadFailed(String)
-    case quotaExceeded
-    case networkError
-    case invalidLocalPath
-    case fileSystemError(String)
-    
-    var errorDescription: String? {
-        switch self {
-        case .invalidImage:
-            return "Ungültiges Bildformat"
-        case .compressionFailed:
-            return "Bildkomprimierung fehlgeschlagen"
-        case .uploadFailed(let message):
-            return "Upload fehlgeschlagen: \(message)"
-        case .downloadFailed(let message):
-            return "Download fehlgeschlagen: \(message)"
-        case .quotaExceeded:
-            return "Speicherplatz-Limit überschritten"
-        case .networkError:
-            return "Netzwerkfehler"
-        case .invalidLocalPath:
-            return "Ungültiger lokaler Pfad"
-        case .fileSystemError(let message):
-            return "Dateisystem-Fehler: \(message)"
-        }
-    }
-}
-
 // MARK: - Helper Structures
 private struct ProcessedImage {
     let data: Data
@@ -70,6 +37,7 @@ class JournalService {
     private var retryCount = 0
     private let maxRetries = 3
     private let pendingUploadsKey = "pendingImageUploads"
+    private let storageManager = StorageManager.shared
     
     // MARK: - Constants
     private struct Constants {
@@ -164,6 +132,12 @@ class JournalService {
             }
             if let imageURLs = entry.imageURLs, !imageURLs.isEmpty { dict["imageURLs"] = imageURLs }
             
+            // WICHTIG: Speichere auch lokale Pfade
+            if let localPaths = entry.localImagePaths, !localPaths.isEmpty { 
+                dict["localImagePaths"] = localPaths 
+                logger.debug("Speichere lokale Bildpfade in Firestore: \(localPaths)")
+            }
+            
             // Implementiere Retry-Logik mit exponentieller Verzögerung
             var attempt = 0
             var lastError: Error?
@@ -237,6 +211,14 @@ class JournalService {
                         )
                     }
                     
+                    // Extrahiere Bild-URLs und lokale Pfade
+                    let imageURLs = data["imageURLs"] as? [String]
+                    let localImagePaths = data["localImagePaths"] as? [String]
+                    
+                    if localImagePaths != nil {
+                        self.logger.debug("Gefundene lokale Bildpfade für Eintrag \(document.documentID): \(String(describing: localImagePaths))")
+                    }
+                    
                     // Handle server timestamp
                     let serverTimestamp = data["serverTimestamp"] as? Timestamp
                     
@@ -250,7 +232,9 @@ class JournalService {
                         learningNugget: learningNugget,
                         lastModified: lastModifiedTimestamp.dateValue(),
                         syncStatus: syncStatus,
-                        serverTimestamp: serverTimestamp
+                        serverTimestamp: serverTimestamp,
+                        imageURLs: imageURLs,
+                        localImagePaths: localImagePaths
                     )
                 }
             } catch let error as NSError {
@@ -308,6 +292,14 @@ class JournalService {
                             )
                         }
                         
+                        // Extrahiere Bild-URLs und lokale Pfade
+                        let imageURLs = data["imageURLs"] as? [String]
+                        let localImagePaths = data["localImagePaths"] as? [String]
+                        
+                        if localImagePaths != nil {
+                            self.logger.debug("Gefundene lokale Bildpfade für Eintrag \(documentId): \(String(describing: localImagePaths))")
+                        }
+                        
                         // Erstelle den JournalEntry mit den extrahierten Daten
                         return JournalEntry(
                             id: documentId,
@@ -319,7 +311,12 @@ class JournalService {
                             learningNugget: learningNugget,
                             lastModified: lastModifiedTimestamp.dateValue(),
                             syncStatus: syncStatus,
-                            serverTimestamp: serverTimestamp
+                            serverTimestamp: serverTimestamp,
+                            title: data["title"] as? String,
+                            content: data["content"] as? String,
+                            location: data["location"] as? String,
+                            imageURLs: imageURLs,
+                            localImagePaths: localImagePaths
                         )
                     }.sorted { $0.date > $1.date }
                 } else {
@@ -441,6 +438,14 @@ class JournalService {
                         )
                     }
                     
+                    // Extrahiere Bild-URLs und lokale Pfade
+                    let imageURLs = data["imageURLs"] as? [String]
+                    let localImagePaths = data["localImagePaths"] as? [String]
+                    
+                    if localImagePaths != nil {
+                        self.logger.debug("Gefundene lokale Bildpfade für Eintrag \(documentId): \(String(describing: localImagePaths))")
+                    }
+                    
                     // Erstelle den JournalEntry mit den extrahierten Daten
                     return JournalEntry(
                         id: documentId,
@@ -452,7 +457,12 @@ class JournalService {
                         learningNugget: learningNugget,
                         lastModified: lastModifiedTimestamp.dateValue(),
                         syncStatus: syncStatus,
-                        serverTimestamp: serverTimestamp
+                        serverTimestamp: serverTimestamp,
+                        title: data["title"] as? String,
+                        content: data["content"] as? String,
+                        location: data["location"] as? String,
+                        imageURLs: imageURLs,
+                        localImagePaths: localImagePaths
                     )
                 }.sorted { $0.date > $1.date }
                 
@@ -593,7 +603,7 @@ class JournalService {
             
             image.draw(in: CGRect(origin: .zero, size: newSize))
             guard let resizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
-                throw StorageError.compressionFailed
+                throw FirebaseError.storageError("Fehler bei der Bildkomprimierung")
             }
             scaledImage = resizedImage
         } else {
@@ -604,134 +614,176 @@ class JournalService {
         guard let imageData = scaledImage.jpegData(compressionQuality: Constants.compressionQuality),
               !imageData.isEmpty,
               imageData.count <= Constants.maxFileSize else {
-            throw StorageError.compressionFailed
+            throw FirebaseError.storageError("Fehler bei der Bildkomprimierung")
         }
         
         return ProcessedImage(data: imageData, size: scaledImage.size, filename: filename)
     }
     
     // MARK: - Local Storage
-    private func saveImageLocally(_ processedImage: ProcessedImage, entryId: String) async throws -> String {
-        let fileManager = FileManager.default
-        guard let documentsPath = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            throw StorageError.fileSystemError("Dokumentenverzeichnis nicht verfügbar")
+    func saveImageLocally(_ image: UIImage, entryId: String) async throws -> String {
+        guard let data = image.jpegData(compressionQuality: 0.7) else {
+            throw FirebaseError.storageError("Fehler beim Komprimieren des Bildes")
         }
         
-        let sanitizedEntryId = entryId.replacingOccurrences(of: "/", with: "_")
-        let journalImagesPath = documentsPath.appendingPathComponent("journal_images")
-            .appendingPathComponent(sanitizedEntryId)
-        
         do {
-            try fileManager.createDirectory(at: journalImagesPath, withIntermediateDirectories: true, attributes: nil)
-            let imagePath = journalImagesPath.appendingPathComponent(processedImage.filename)
+            // Erstelle einen eindeutigen Dateinamen
+            let uniqueID = UUID().uuidString
+            let filename = "journal_image_\(entryId)_\(uniqueID).jpg"
             
-            try processedImage.data.write(to: imagePath)
-            
-            // Validiere die geschriebene Datei
-            guard let writtenData = try? Data(contentsOf: imagePath),
-                  !writtenData.isEmpty,
-                  UIImage(data: writtenData) != nil else {
-                try? fileManager.removeItem(at: imagePath)
-                throw StorageError.fileSystemError("Validierung der geschriebenen Datei fehlgeschlagen")
+            // Verwende das Documents-Verzeichnis für persistente Speicherung
+            guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                throw FirebaseError.storageError("Konnte kein Documents-Verzeichnis finden")
             }
             
-            return imagePath.path
+            // Erstelle ein dediziertes Verzeichnis für Journal-Bilder
+            let imagesDirectory = documentsDirectory.appendingPathComponent("JournalImages", isDirectory: true)
+            try FileManager.default.createDirectory(at: imagesDirectory, withIntermediateDirectories: true, attributes: nil)
+            
+            // Erstelle den vollständigen Datei-URL
+            let fileURL = imagesDirectory.appendingPathComponent(filename)
+            
+            // Schreibe die Daten atomar in die Datei
+            try data.write(to: fileURL, options: [.atomic])
+            
+            logger.debug("Bild erfolgreich lokal gespeichert unter: \(fileURL.path)")
+            
+            // Wir speichern nur den relativen Pfad ab Documents-Verzeichnis
+            // Dies macht den Pfad portabler zwischen App-Neustarts
+            let relativePath = "JournalImages/\(filename)"
+            logger.debug("Relativer Pfad für Speicherung: \(relativePath)")
+            
+            return relativePath
         } catch {
-            throw StorageError.fileSystemError(error.localizedDescription)
+            logger.error("Fehler beim lokalen Speichern des Bildes: \(error.localizedDescription)")
+            throw FirebaseError.storageError("Fehler beim lokalen Speichern: \(error.localizedDescription)")
         }
     }
     
     // MARK: - Cloud Storage
-    private func uploadImageToCloud(_ processedImage: ProcessedImage, entryId: String) async throws -> String {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            throw StorageError.uploadFailed("Kein authentifizierter Benutzer")
+    private func uploadImageToCloud(_ image: UIImage, entryId: String) async throws -> String {
+        guard let data = image.jpegData(compressionQuality: 0.7) else {
+            throw FirebaseError.storageError("Fehler beim Komprimieren des Bildes")
         }
         
-        let storage = Storage.storage()
-        let sanitizedEntryId = entryId.replacingOccurrences(of: "/", with: "_")
-        let imagePath = "journal_images/\(userId)/\(sanitizedEntryId)/\(processedImage.filename)"
-        let imageRef = storage.reference().child(imagePath)
+        let uniqueID = UUID().uuidString
+        // Filename muss format journal_image_ENTRYID_UNIQUEID.jpg haben
+        // damit die entryId extrahiert werden kann
+        let filename = "journal_image_\(entryId)_\(uniqueID).jpg"
         
-        let metadata = StorageMetadata()
-        metadata.contentType = "image/jpeg"
-        metadata.customMetadata = [
-            "uploadDate": ISO8601DateFormatter().string(from: Date()),
-            "entryId": entryId,
-            "userId": userId,
-            "width": String(format: "%.0f", processedImage.size.width),
-            "height": String(format: "%.0f", processedImage.size.height)
-        ]
-        
-        do {
-            _ = try await imageRef.putDataAsync(processedImage.data, metadata: metadata)
-            let downloadURL = try await imageRef.downloadURL()
-            return downloadURL.absoluteString
-        } catch let error as NSError {
-            switch error.code {
-            case StorageErrorCode.quotaExceeded.rawValue:
-                throw StorageError.quotaExceeded
-            case StorageErrorCode.retryLimitExceeded.rawValue:
-                throw StorageError.networkError
-            default:
-                throw StorageError.uploadFailed(error.localizedDescription)
-            }
-        }
+        // Verwende einen einfachen Pfad, der mit den Storage-Regeln kompatibel ist
+        // Der tatsächliche Pfad wird im StorageManager passend zu den Rules aufgebaut
+        return try await storageManager.uploadImage(data: data, path: "journal_entries", filename: filename)
     }
     
     // MARK: - Image Management
-    func saveJournalEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
+    func saveJournalEntryWithImages(entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
         guard let entryId = entry.id else {
-            throw StorageError.uploadFailed("Entry ID fehlt")
+            throw FirebaseError.databaseError
         }
         
-        var updatedEntry = entry
-        var localPaths: [String] = []
-        var cloudUrls: [String] = []
+        var localImagePaths: [String] = []
+        var imageURLs: [String] = []
         var errors: [Error] = []
         
-        // Verarbeite jedes Bild
+        // Bilder verarbeiten
         for (index, image) in images.enumerated() {
             do {
-                let filename = "\(UUID().uuidString)_\(index).jpg"
-                let processedImage = try processImage(image, filename: filename)
+                // 1. Lokal speichern
+                let localPath = try await saveImageLocally(image, entryId: entryId)
+                localImagePaths.append(localPath)
+                logger.info("Bild \(index) lokal gespeichert: \(localPath)")
                 
-                // Speichere lokal
-                let localPath = try await saveImageLocally(processedImage, entryId: entryId)
-                localPaths.append(localPath)
-                
-                // Upload zur Cloud wenn online
+                // 2. In die Cloud hochladen, wenn das Gerät online ist
                 if NetworkMonitor.shared.isConnected {
-                    let cloudUrl = try await uploadImageToCloud(processedImage, entryId: entryId)
-                    cloudUrls.append(cloudUrl)
+                    do {
+                        let cloudURL = try await uploadImageToCloud(image, entryId: entryId)
+                        imageURLs.append(cloudURL)
+                        logger.info("Bild \(index) erfolgreich in die Cloud hochgeladen: \(cloudURL)")
+                    } catch let uploadError as StorageError {
+                        logger.error("Fehler beim Cloud-Upload von Bild \(index): \(uploadError.localizedDescription)")
+                        
+                        // Prüfe auf Berechtigungsprobleme
+                        if let description = uploadError.errorDescription, description.contains("Berechtigung") || description.contains("permission") {
+                            logger.error("⚠️ BERECHTIGUNGSPROBLEM ERKANNT: Vergewissere dich, dass deine Firebase Storage Rules korrekt sind")
+                            logger.error("Berechtigungsproblem erkannt, führe Storage-Diagnose aus")
+                            storageManager.printStorageDiagnostics()
+                        }
+                        
+                        errors.append(uploadError)
+                    } catch {
+                        logger.error("Allgemeiner Fehler beim Cloud-Upload von Bild \(index): \(error.localizedDescription)")
+                        errors.append(error)
+                    }
+                } else {
+                    logger.info("Gerät offline - Bild \(index) wird für späteren Upload markiert")
                 }
             } catch {
+                logger.error("Fehler bei der Verarbeitung von Bild \(index): \(error.localizedDescription)")
                 errors.append(error)
-                logger.error("Fehler bei Bild \(index): \(error.localizedDescription)")
             }
         }
         
-        // Aktualisiere den Entry basierend auf den Ergebnissen
-        if !localPaths.isEmpty {
-            updatedEntry.localImagePaths = localPaths
-        }
-        
-        if !cloudUrls.isEmpty {
-            updatedEntry.imageURLs = cloudUrls
-            updatedEntry.syncStatus = .synced
-        } else if NetworkMonitor.shared.isConnected {
-            updatedEntry.syncStatus = .pendingUpload
-            await addToPendingUploads(paths: localPaths, entryId: entryId)
-        }
-        
-        // Speichere den aktualisierten Entry
-        try await saveJournalEntry(updatedEntry)
-        
-        // Wenn es Fehler gab, aber einige Bilder erfolgreich waren, logge die Fehler
+        // Prüfe auf Fehler nach der Bildverarbeitung
         if !errors.isEmpty {
-            logger.error("Einige Bilder konnten nicht verarbeitet werden: \(errors.count) Fehler")
+            logger.error("Es gab \(errors.count) Fehler beim Verarbeiten der Bilder von insgesamt \(images.count)")
+            
+            if errors.count == images.count {
+                // Wenn alle Bildverarbeitungen fehlgeschlagen sind
+                if let firstError = errors.first {
+                    logger.error("Alle Bildverarbeitungen fehlgeschlagen mit Fehler: \(firstError.localizedDescription)")
+                    throw firstError
+                }
+            } else if localImagePaths.isEmpty {
+                // Wenn keine Bilder lokal gespeichert werden konnten
+                logger.error("Keine Bilder konnten gespeichert werden")
+                throw FirebaseError.storageError("Keine Bilder konnten gespeichert werden")
+            } else {
+                // Einige Bilder wurden gespeichert, andere nicht
+                logger.warning("Einige Bilder konnten nicht vollständig verarbeitet werden")
+                if !imageURLs.isEmpty {
+                    logger.info("Cloud-Upload teilweise erfolgreich: \(imageURLs.count)/\(images.count) Bilder hochgeladen")
+                } else {
+                    logger.warning("Cloud-Upload fehlgeschlagen, aber Bilder wurden lokal gespeichert.")
+                }
+            }
+        } else if imageURLs.isEmpty && !localImagePaths.isEmpty {
+            // Alle Bilder wurden lokal gespeichert, aber keine in die Cloud hochgeladen
+            logger.info("Alle Bilder lokal gespeichert, aber keine in die Cloud hochgeladen")
+            if NetworkMonitor.shared.isConnected {
+                logger.warning("Das Gerät ist online, aber der Cloud-Upload schlug fehl. Überprüfe die Firebase Storage Regeln.")
+            } else {
+                logger.info("Das Gerät ist offline - Bilder werden für späteren Upload markiert")
+            }
         }
         
-        return updatedEntry
+        // Aktualisiere den Eintrag mit den Bildpfaden und URLs
+        var updatedEntry = entry
+        updatedEntry.localImagePaths = localImagePaths
+        updatedEntry.imageURLs = imageURLs.isEmpty ? nil : imageURLs
+        
+        // Setze den Sync-Status basierend auf dem Upload-Ergebnis
+        if !localImagePaths.isEmpty && imageURLs.isEmpty {
+            updatedEntry.syncStatus = .pendingUpload
+            // Markiere die Bilder für späteren Upload
+            await addToPendingUploads(paths: localImagePaths, entryId: entryId)
+        } else if !imageURLs.isEmpty {
+            updatedEntry.syncStatus = .synced
+        }
+        
+        let imageURLsString = updatedEntry.imageURLs != nil ? "\(updatedEntry.imageURLs!)" : "nil"
+        let localPathsString = updatedEntry.localImagePaths != nil ? "\(updatedEntry.localImagePaths!)" : "nil"
+        logger.info("Eintrag gespeichert mit URLs: \(imageURLsString)")
+        logger.info("Lokale Pfade: \(localPathsString)")
+        
+        // Speichere den aktualisierten Eintrag in Firestore
+        do {
+            try await saveJournalEntry(updatedEntry)
+            return updatedEntry
+        } catch {
+            logger.error("Fehler beim Speichern des Eintrags: \(error.localizedDescription)")
+            throw error
+        }
     }
     
     func deleteCloudImages(urls: [String]) async throws {
@@ -748,7 +800,7 @@ class JournalService {
                 logger.info("Bild erfolgreich gelöscht: \(url)")
             } catch {
                 logger.error("Fehler beim Löschen des Bildes: \(error.localizedDescription)")
-                throw StorageError.uploadFailed("Fehler beim Löschen: \(error.localizedDescription)")
+                throw FirebaseError.storageError("Fehler beim Löschen: \(error.localizedDescription)")
             }
         }
     }
@@ -783,7 +835,7 @@ class JournalService {
                 
                 let filename = URL(fileURLWithPath: upload.localPath).lastPathComponent
                 let processedImage = try processImage(image, filename: filename)
-                let cloudUrl = try await uploadImageToCloud(processedImage, entryId: upload.entryId)
+                let cloudUrl = try await uploadImageToCloud(image, entryId: upload.entryId)
                 
                 if let entry = try? await getJournalEntry(withId: upload.entryId) {
                     var updatedEntry = entry
@@ -839,6 +891,14 @@ class JournalService {
         )
     }
     
+    // MARK: - Diagnostic Methods
+    
+    /// Führt eine Diagnose der Firebase Storage-Konfiguration durch
+    func runStorageDiagnostics() {
+        logger.info("Starte Storage-Diagnose...")
+        storageManager.printStorageDiagnostics()
+    }
+    
     // MARK: - Error Types
     
     enum FirebaseError: LocalizedError {
@@ -848,6 +908,7 @@ class JournalService {
         case syncFailed(String)
         case storageError(String)
         case resourceExhausted
+        case databaseError
         
         var errorDescription: String? {
             switch self {
@@ -859,6 +920,8 @@ class JournalService {
                 return message
             case .resourceExhausted:
                 return "Resource exhausted"
+            case .databaseError:
+                return "Database error"
             }
         }
     }

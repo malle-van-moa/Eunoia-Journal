@@ -14,6 +14,7 @@ class JournalViewModel: ObservableObject {
     @Published var journalEntries: [JournalEntry] = []
     @Published var isLoading = false
     @Published var error: Error?
+    @Published var errorMessage: String?
     @Published var currentEntry: JournalEntry?
     @Published var aiSuggestions: [String] = []
     @Published var learningNugget: LearningNugget?
@@ -105,6 +106,22 @@ class JournalViewModel: ObservableObject {
         Task {
             do {
                 let entries = try await coreDataManager.fetchJournalEntries(for: userId)
+                
+                // Debug-Informationen für lokale Einträge
+                for entry in entries {
+                    if let localPaths = entry.localImagePaths, !localPaths.isEmpty {
+                        self.logger.debug("[LocalLoad] Eintrag mit lokalen Bildpfaden geladen: \(String(describing: entry.id))")
+                        // Array als String mit Trennzeichen darstellen
+                        let pathsString = localPaths.joined(separator: ", ")
+                        self.logger.debug("[LocalLoad] Lokale Bildpfade: \(pathsString)")
+                    }
+                    
+                    if let imageURLs = entry.imageURLs, !imageURLs.isEmpty {
+                        self.logger.debug("[LocalLoad] Eintrag mit Cloud-URLs geladen: \(String(describing: entry.id))")
+                        self.logger.debug("[LocalLoad] Anzahl URLs: \(imageURLs.count)")
+                    }
+                }
+                
                 DispatchQueue.main.async {
                     self.journalEntries = entries
                 }
@@ -133,6 +150,22 @@ class JournalViewModel: ObservableObject {
                 }
             } receiveValue: { [weak self] entries in
                 guard let self = self else { return }
+                
+                // Debug-Informationen für Bildpfade
+                for entry in entries {
+                    if let localPaths = entry.localImagePaths, !localPaths.isEmpty {
+                        self.logger.debug("[JournalViewModel] Eintrag empfangen mit lokalen Bildpfaden: \(String(describing: entry.id))")
+                        // Array als String mit Trennzeichen darstellen
+                        let pathsString = localPaths.joined(separator: ", ")
+                        self.logger.debug("[JournalViewModel] Lokale Bildpfade: \(pathsString)")
+                    }
+                    
+                    if let imageURLs = entry.imageURLs, !imageURLs.isEmpty {
+                        self.logger.debug("[JournalViewModel] Eintrag empfangen mit Cloud-Bild-URLs: \(String(describing: entry.id))")
+                        self.logger.debug("[JournalViewModel] Anzahl URLs: \(imageURLs.count)")
+                    }
+                }
+                
                 self.journalEntries = entries
             }
             .store(in: &cancellables)
@@ -447,7 +480,12 @@ class JournalViewModel: ObservableObject {
     }
     
     func generateLearningNugget(for category: LearningNugget.Category) {
+        // Beende, wenn bereits ein Ladevorgang läuft
+        guard !isLoading else { return }
+        
         isLoading = true
+        errorMessage = nil
+        error = nil
         
         Task {
             do {
@@ -460,9 +498,37 @@ class JournalViewModel: ObservableObject {
                 }
             } catch {
                 await MainActor.run {
-                    self.error = error
                     self.isLoading = false
-                    self.logger.error("Fehler bei der Generierung des Learning Nuggets: \(error.localizedDescription)")
+                    
+                    if let serviceError = error as? ServiceError {
+                        self.error = serviceError
+                        
+                        // Spezifische Fehlerbehandlung basierend auf dem Fehlertyp
+                        switch serviceError {
+                        case .apiQuotaExceeded:
+                            self.errorMessage = "Das tägliche Limit für KI-Generierungen wurde erreicht. Bitte versuche es morgen erneut."
+                            self.logger.error("API-Quota überschritten: \(serviceError.localizedDescription)")
+                        case .aiServiceUnavailable:
+                            self.errorMessage = "Der KI-Service ist derzeit nicht verfügbar. Bitte versuche es später erneut."
+                            self.logger.error("KI-Service nicht verfügbar: \(serviceError.localizedDescription)")
+                        case .networkError:
+                            self.errorMessage = "Es konnte keine Verbindung zum Netzwerk hergestellt werden. Bitte überprüfe deine Internetverbindung."
+                            self.logger.error("Netzwerkfehler: \(serviceError.localizedDescription)")
+                        case .databaseError:
+                            self.errorMessage = "Datenbankfehler: \(serviceError.localizedDescription)"
+                            self.logger.error("Datenbankfehler: \(serviceError.localizedDescription)")
+                        case .aiGeneration(let message):
+                            self.errorMessage = "Beim Generieren des Learning Nuggets ist ein Fehler aufgetreten: \(message)"
+                            self.logger.error("KI-Generierungsfehler: \(serviceError.localizedDescription)")
+                        default:
+                            self.errorMessage = "Beim Generieren des Learning Nuggets ist ein Fehler aufgetreten. Bitte versuche es erneut."
+                            self.logger.error("Allgemeiner Fehler: \(serviceError.localizedDescription)")
+                        }
+                    } else {
+                        self.error = error
+                        self.errorMessage = "Beim Generieren des Learning Nuggets ist ein Fehler aufgetreten. Bitte versuche es erneut."
+                        self.logger.error("Unbekannter Fehler bei der Generierung des Learning Nuggets: \(error.localizedDescription)")
+                    }
                 }
             }
         }
@@ -559,10 +625,6 @@ class JournalViewModel: ObservableObject {
         return streak
     }
     
-    var errorMessage: String {
-        error?.localizedDescription ?? ""
-    }
-    
     #if canImport(JournalingSuggestions)
     @available(iOS 17.2, *)
     @MainActor
@@ -633,12 +695,22 @@ class JournalViewModel: ObservableObject {
         // Lösche auch lokale Bilder, falls vorhanden
         if let localPaths = entry.localImagePaths {
             for path in localPaths {
-                try? FileManager.default.removeItem(atPath: path)
+                // Bestimme, ob es sich um einen vollständigen oder relativen Pfad handelt
+                if path.hasPrefix("/") {
+                    // Vollständiger Pfad
+                    try? FileManager.default.removeItem(atPath: path)
+                } else {
+                    // Relativer Pfad
+                    if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                        let fullPath = documentsDirectory.appendingPathComponent(path).path
+                        try? FileManager.default.removeItem(atPath: fullPath)
+                    }
+                }
             }
         }
         
         // Speichere den Eintrag mit den neuen Bildern
-        let updatedEntry = try await journalService.saveJournalEntryWithImages(entry, images: images)
+        let updatedEntry = try await journalService.saveJournalEntryWithImages(entry: entry, images: images)
         
         // Aktualisiere den lokalen Cache
         await MainActor.run {
@@ -659,7 +731,17 @@ class JournalViewModel: ObservableObject {
         // Lösche lokale Bilder
         if let localPaths = entry.localImagePaths {
             for path in localPaths {
-                try? FileManager.default.removeItem(atPath: path)
+                // Bestimme, ob es sich um einen vollständigen oder relativen Pfad handelt
+                if path.hasPrefix("/") {
+                    // Vollständiger Pfad
+                    try? FileManager.default.removeItem(atPath: path)
+                } else {
+                    // Relativer Pfad
+                    if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                        let fullPath = documentsDirectory.appendingPathComponent(path).path
+                        try? FileManager.default.removeItem(atPath: fullPath)
+                    }
+                }
             }
         }
         

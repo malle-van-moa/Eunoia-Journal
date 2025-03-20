@@ -24,11 +24,33 @@ service cloud.firestore {
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
     
-    // Learning Nuggets
+    // Learning Nuggets (persönliche Nuggets)
     match /learningNuggets/{nuggetId} {
       allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Gemeinsam genutzte Learning Nuggets (Rolling Refill System)
+    match /learning_nuggets/{nuggetId} {
+      allow read: if isSignedIn();
+      // Schreibzugriff nur für Cloud Functions oder Admin
+      allow write: if false;
+    }
+    
+    // Benutzer-Nugget-Zuordnungen (Rolling Refill System)
+    match /user_nuggets/{recordId} {
+      // Erlaube Lesen, wenn der Benutzer authentifiziert ist und der Owner des Records ist
+      allow read: if isSignedIn() && (resource == null || resource.data.user_id == request.auth.uid);
+      
+      // Erlaube Erstellen, wenn der Benutzer authentifiziert ist und sich selbst als Owner einträgt
+      allow create: if isSignedIn() && request.resource.data.user_id == request.auth.uid;
+      
+      // Erlaube Aktualisieren, wenn der Benutzer authentifiziert ist und der Owner des Records ist
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      
+      // Löschen nicht erlaubt
+      allow delete: if false;
     }
     
     // Zusätzliche Regel für Listen-Abfragen

@@ -51,13 +51,59 @@ struct JournalEntryView: View {
     }
     
     private func loadImages() -> [UIImage]? {
-        guard let localPaths = entry?.localImagePaths else { return nil }
-        let images = localPaths.compactMap { path -> UIImage? in
-            guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
-            let fileURL = documentsDirectory.appendingPathComponent(path)
-            return UIImage(contentsOfFile: fileURL.path)
+        guard let localPaths = entry?.localImagePaths else {
+            print("Keine lokalen Bildpfade gefunden")
+            return nil 
         }
-        return images.isEmpty ? nil : images
+        
+        print("Versuche \(localPaths.count) Bilder zu laden")
+        
+        let images = localPaths.compactMap { path -> UIImage? in
+            // Bestimme, ob es sich um einen vollständigen oder relativen Pfad handelt
+            let isFullPath = path.hasPrefix("/")
+            
+            let fileURL: URL
+            if isFullPath {
+                // Verwende den vollständigen Pfad direkt
+                fileURL = URL(fileURLWithPath: path)
+                print("Vollständiger Pfad erkannt: \(path)")
+            } else {
+                // Relativer Pfad: füge Documents-Verzeichnis hinzu
+                guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                    print("⚠️ Konnte Documents-Verzeichnis nicht finden")
+                    return nil
+                }
+                fileURL = documentsDirectory.appendingPathComponent(path)
+                print("Relativer Pfad zu absolut konvertiert: \(fileURL.path)")
+            }
+            
+            // Überprüfe, ob die Datei existiert
+            let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
+            print("Prüfe Bild an Pfad: \(fileURL.path) - Existiert: \(fileExists)")
+            
+            if !fileExists {
+                print("⚠️ Bilddatei nicht gefunden: \(fileURL.path)")
+                return nil
+            }
+            
+            // Versuche das Bild zu laden
+            guard let imageData = try? Data(contentsOf: fileURL),
+                  let image = UIImage(data: imageData) else {
+                print("⚠️ Fehler beim Laden des Bildes von: \(fileURL.path)")
+                return nil
+            }
+            
+            print("✅ Bild erfolgreich geladen: \(fileURL.path)")
+            return image
+        }
+        
+        if images.isEmpty {
+            print("Keine Bilder konnten geladen werden")
+            return nil
+        } else {
+            print("Erfolgreich \(images.count) Bilder geladen")
+            return images
+        }
     }
     
     private var gratitudeBinding: Binding<String> {
@@ -94,9 +140,32 @@ struct JournalEntryView: View {
     }
     
     private func handleError(_ error: Error) {
-        DispatchQueue.main.async {
+        // Verzögerung, um sicherzustellen, dass nur ein Alert angezeigt wird
+        let workItem = DispatchWorkItem {
+            // Wenn die Processing-Anzeige noch aktiv ist, diese zuerst deaktivieren
+            self.showingProcessingIndicator = false
+            
             let journalError: JournalError
-            if let nsError = error as? NSError {
+            
+            // Behandlung von ServiceError-Typen
+            if let serviceError = error as? ServiceError {
+                switch serviceError {
+                case .apiQuotaExceeded:
+                    journalError = .quotaError("Das Kontingent für KI-Generierungen wurde überschritten. Bitte versuche es später erneut.")
+                case .aiServiceUnavailable:
+                    journalError = .aiServiceError("Der KI-Service ist derzeit nicht verfügbar. Bitte versuche es später erneut.")
+                case .userNotAuthenticated:
+                    journalError = .authError
+                case .networkError:
+                    journalError = .networkError("Netzwerkfehler: Bitte überprüfe deine Internetverbindung.")
+                case .databaseError:
+                    journalError = .databaseError("Fehler beim Zugriff auf die Datenbank.")
+                case .aiGeneration(let message):
+                    journalError = .aiGenerationError(message)
+                default:
+                    journalError = .saveError(serviceError.localizedDescription)
+                }
+            } else if let nsError = error as? NSError {
                 switch nsError.code {
                 case 401:
                     journalError = .authError
@@ -110,6 +179,9 @@ struct JournalEntryView: View {
             }
             self.identifiableError = IdentifiableError(journalError: journalError)
         }
+        
+        // Führe den WorkItem aus
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
     }
     
     var body: some View {
@@ -147,7 +219,18 @@ struct JournalEntryView: View {
                 clearError()
             }
         } message: {
-            errorContent
+            if let error = identifiableError {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(error.journalError.errorDescription ?? "")
+                        .fontWeight(.medium)
+                    
+                    if let recoverySuggestion = error.journalError.recoverySuggestion {
+                        Text(recoverySuggestion)
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
         .task {
             setupInitialState()
@@ -209,7 +292,15 @@ struct JournalEntryView: View {
     private var learningNuggetSection: some View {
         Group {
             if let nugget = viewModel.learningNugget ?? entry?.learningNugget {
-                LearningNuggetView(nugget: nugget)
+                LearningNuggetView(nugget: nugget) {
+                    // Setze das aktuelle Learning Nugget zurück, damit ein neues geladen werden kann
+                    viewModel.learningNugget = nil
+                    
+                    // Verzögere das Öffnen des Auswahlfensters, damit die onReceive-Handler Zeit haben
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        showingLearningNugget = true
+                    }
+                }
             } else {
                 learningNuggetButton
             }
@@ -313,12 +404,40 @@ struct JournalEntryView: View {
         Section(header: Text("Bilder")) {
             VStack(alignment: .leading, spacing: 10) {
                 if !selectedImages.isEmpty {
+                    // Zeige ausgewählte Bilder, die noch nicht gespeichert wurden
+                    Text("Neue Bilder: \(selectedImages.count)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
                     ImageGalleryView(images: selectedImages) { index in
                         selectedImages.remove(at: index)
                     }
                     .frame(height: 120)
+                } else if let loadedImages = loadImages(), !loadedImages.isEmpty {
+                    // Zeige lokale Bilder vom Gerät
+                    Text("Lokale Bilder: \(loadedImages.count)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 10) {
+                            ForEach(0..<loadedImages.count, id: \.self) { index in
+                                Image(uiImage: loadedImages[index])
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: 100, height: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                    .frame(height: 120)
                 } else if let entry = entry, let urls = entry.imageURLs, !urls.isEmpty {
-                    // Zeige Cloud-Bilder
+                    // Zeige Cloud-Bilder als Fallback
+                    Text("Cloud-Bilder: \(urls.count)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
                     ScrollView(.horizontal, showsIndicators: false) {
                         LazyHStack(spacing: 10) {
                             ForEach(urls, id: \.self) { url in
@@ -345,6 +464,10 @@ struct JournalEntryView: View {
                         .padding(.horizontal)
                     }
                     .frame(height: 120)
+                } else {
+                    Text("Keine Bilder vorhanden")
+                        .font(.caption)
+                        .foregroundColor(.gray)
                 }
                 
                 if selectedImages.count < maxImages {
@@ -354,14 +477,6 @@ struct JournalEntryView: View {
                     )
                 }
             }
-        }
-    }
-    
-    private var errorContent: some View {
-        if let error = identifiableError {
-            Text(error.journalError.errorDescription ?? "Unbekannter Fehler")
-        } else {
-            Text("")
         }
     }
     
@@ -435,6 +550,10 @@ enum JournalError: LocalizedError {
     case saveError(String)
     case loadError(String)
     case networkError(String)
+    case quotaError(String)
+    case aiServiceError(String)
+    case aiGenerationError(String)
+    case databaseError(String)
     
     var errorDescription: String? {
         switch self {
@@ -446,6 +565,29 @@ enum JournalError: LocalizedError {
             return "Fehler beim Laden: \(message)"
         case .networkError(let message):
             return "Netzwerkfehler: \(message)"
+        case .quotaError(let message):
+            return message
+        case .aiServiceError(let message):
+            return message
+        case .aiGenerationError(let message):
+            return "Fehler bei der KI-Generierung: \(message)"
+        case .databaseError(let message):
+            return "Datenbankfehler: \(message)"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .quotaError:
+            return "Dein monatliches Kontingent für KI-Generierungen wurde erreicht. Das Kontingent wird am Anfang des nächsten Monats zurückgesetzt."
+        case .aiServiceError:
+            return "Der KI-Service ist momentan nicht erreichbar. Du kannst es später erneut versuchen oder die App neu starten."
+        case .networkError:
+            return "Stelle sicher, dass deine Internetverbindung aktiv ist und versuche es erneut."
+        case .databaseError:
+            return "Bitte folge dem Link in der Fehlermeldung, um den erforderlichen Datenbankindex zu erstellen, oder kontaktiere den Support."
+        default:
+            return nil
         }
     }
 }
@@ -491,13 +633,27 @@ struct JournalSection: View {
 
 struct LearningNuggetView: View {
     let nugget: LearningNugget
+    var onReload: (() -> Void)?
+    
+    private var formattedTitle: String {
+        // Entferne Anführungszeichen (einfache und doppelte) am Anfang und Ende des Titels
+        var title = nugget.title
+        if title.hasPrefix("\"") && title.hasSuffix("\"") {
+            title = String(title.dropFirst().dropLast())
+        } else if title.hasPrefix("'") && title.hasSuffix("'") {
+            title = String(title.dropFirst().dropLast())
+        } else if title.hasPrefix("**") && title.hasSuffix("**") {
+            title = String(title.dropFirst(2).dropLast(2))
+        }
+        return title
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "lightbulb.fill")
                     .foregroundColor(.yellow)
-                Text(nugget.title)
+                Text(formattedTitle)
                     .font(.headline)
                 Spacer()
                 Text(nugget.category.rawValue.capitalized)
@@ -514,13 +670,31 @@ struct LearningNuggetView: View {
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            if nugget.isAddedToJournal {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Zum Journal hinzugefügt")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            HStack {
+                if nugget.isAddedToJournal {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Zum Journal hinzugefügt")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                if let onReload = onReload {
+                    Button(action: onReload) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Neues Nugget")
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+                    }
                 }
             }
         }
@@ -563,6 +737,7 @@ struct LearningNuggetPickerView: View {
     @ObservedObject var viewModel: JournalViewModel
     @State private var identifiableError: IdentifiableError?
     @State private var showingProcessingIndicator = false
+    @State private var selectedCategory: LearningNugget.Category = .persönlichesWachstum
     
     var body: some View {
         NavigationView {
@@ -573,7 +748,10 @@ struct LearningNuggetPickerView: View {
             .navigationTitle("Wähle eine Kategorie")
             .navigationBarItems(trailing: cancelButton)
             .onReceive(viewModel.$learningNugget) { nugget in
-                handleNuggetChange(nugget)
+                // Nur reagieren, wenn ein Nugget gesetzt wird, nicht wenn es gelöscht wird
+                if nugget != nil {
+                    handleNuggetChange(nugget)
+                }
             }
             .onReceive(viewModel.$error) { error in
                 showingProcessingIndicator = false
@@ -586,13 +764,24 @@ struct LearningNuggetPickerView: View {
                     clearError()
                 }
             } message: {
-                Text(identifiableError?.journalError.errorDescription ?? "")
+                if let error = identifiableError {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(error.journalError.errorDescription ?? "")
+                            .fontWeight(.medium)
+                        
+                        if let recoverySuggestion = error.journalError.recoverySuggestion {
+                            Text(recoverySuggestion)
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
             }
         }
     }
     
     private var categoryList: some View {
-        List(LearningNugget.Category.allCases, id: \.self) { category in
+        List(LearningNugget.Category.allCases.filter { $0 != .aiGenerated }, id: \.self) { category in
             categoryButton(for: category)
         }
     }
@@ -623,7 +812,7 @@ struct LearningNuggetPickerView: View {
                     VStack {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        Text(showingProcessingIndicator ? "Verarbeite Antwort..." : "Generiere Lernerkenntnis...")
+                        Text(showingProcessingIndicator ? "Verarbeite Antwort..." : "Lade Learning Nugget...")
                             .foregroundColor(.white)
                             .padding(.top)
                     }
@@ -646,8 +835,33 @@ struct LearningNuggetPickerView: View {
     }
     
     private func selectCategory(_ category: LearningNugget.Category) {
+        // Vermeide doppelte Aktionen, wenn bereits ein Generierungsvorgang läuft
+        guard !viewModel.isLoading && !showingProcessingIndicator else { return }
+        
+        // Zurücksetzen von Fehler vor dem Start der Generierung
+        clearError()
+        
         showingProcessingIndicator = true
-        viewModel.generateLearningNugget(for: category)
+        selectedCategory = category
+        
+        Task {
+            do {
+                guard let userId = Auth.auth().currentUser?.uid else {
+                    throw ServiceError.userNotAuthenticated
+                }
+                
+                let nugget = try await SharedLearningNuggetService.shared.fetchLearningNugget(for: category, userId: userId)
+                await MainActor.run {
+                    viewModel.learningNugget = nugget
+                    showingProcessingIndicator = false
+                }
+            } catch {
+                await MainActor.run {
+                    handleError(error)
+                    showingProcessingIndicator = false
+                }
+            }
+        }
     }
     
     private func handleNuggetChange(_ nugget: LearningNugget?) {
@@ -658,9 +872,32 @@ struct LearningNuggetPickerView: View {
     }
     
     private func handleError(_ error: Error) {
-        DispatchQueue.main.async {
+        // Verzögerung, um sicherzustellen, dass nur ein Alert angezeigt wird
+        let workItem = DispatchWorkItem {
+            // Wenn die Processing-Anzeige noch aktiv ist, diese zuerst deaktivieren
+            self.showingProcessingIndicator = false
+            
             let journalError: JournalError
-            if let nsError = error as? NSError {
+            
+            // Behandlung von ServiceError-Typen
+            if let serviceError = error as? ServiceError {
+                switch serviceError {
+                case .apiQuotaExceeded:
+                    journalError = .quotaError("Das Kontingent für KI-Generierungen wurde überschritten. Bitte versuche es später erneut.")
+                case .aiServiceUnavailable:
+                    journalError = .aiServiceError("Der KI-Service ist derzeit nicht verfügbar. Bitte versuche es später erneut.")
+                case .userNotAuthenticated:
+                    journalError = .authError
+                case .networkError:
+                    journalError = .networkError("Netzwerkfehler: Bitte überprüfe deine Internetverbindung.")
+                case .databaseError:
+                    journalError = .databaseError("Fehler beim Zugriff auf die Datenbank.")
+                case .aiGeneration(let message):
+                    journalError = .aiGenerationError(message)
+                default:
+                    journalError = .saveError(serviceError.localizedDescription)
+                }
+            } else if let nsError = error as? NSError {
                 switch nsError.code {
                 case 401:
                     journalError = .authError
@@ -674,6 +911,9 @@ struct LearningNuggetPickerView: View {
             }
             self.identifiableError = IdentifiableError(journalError: journalError)
         }
+        
+        // Führe den WorkItem aus
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: workItem)
     }
     
     private func clearError() {
