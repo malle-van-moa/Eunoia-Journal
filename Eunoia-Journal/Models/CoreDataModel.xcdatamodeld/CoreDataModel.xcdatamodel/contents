@@ -1,12 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23507" systemVersion="24C101" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
-    <entity name="ImageEntity" representedClassName=".ImageEntity" syncable="YES">
-        <attribute name="id" optional="YES" attributeType="String"/>
-        <attribute name="localPath" optional="YES" attributeType="String"/>
-        <attribute name="uploadDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="url" optional="YES" attributeType="String"/>
-        <relationship name="journalEntry" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CoreDataJournalEntry" inverseName="imageRelationship" inverseEntity="CoreDataJournalEntry"/>
-    </entity>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23507" systemVersion="24D81" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="CoreDataJournalEntry" representedClassName=".CoreDataJournalEntry" syncable="YES">
         <attribute name="content" optional="YES" attributeType="String"/>
         <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -34,6 +27,13 @@
         <attribute name="title" optional="YES" attributeType="String"/>
         <relationship name="visionBoard" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="VisionBoardEntity" inverseName="goals" inverseEntity="VisionBoardEntity"/>
     </entity>
+    <entity name="ImageEntity" representedClassName=".ImageEntity" syncable="YES">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="localPath" optional="YES" attributeType="String"/>
+        <attribute name="uploadDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="url" optional="YES" attributeType="String"/>
+        <relationship name="journalEntry" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CoreDataJournalEntry" inverseName="imageRelationship" inverseEntity="CoreDataJournalEntry"/>
+    </entity>
     <entity name="PersonalValueEntity" representedClassName="PersonalValueEntity" syncable="YES" codeGenerationType="class">
         <attribute name="id" optional="YES" attributeType="String"/>
         <attribute name="importance" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
@@ -58,6 +58,7 @@
         <attribute name="personalityTraits" optional="YES" attributeType="String"/>
         <attribute name="syncStatus" optional="YES" attributeType="String"/>
         <attribute name="userId" optional="YES" attributeType="String"/>
+        <attribute name="valueCompassData" optional="YES" attributeType="Binary"/>
         <relationship name="goals" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="GoalEntity" inverseName="visionBoard" inverseEntity="GoalEntity"/>
         <relationship name="personalValues" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="PersonalValueEntity" inverseName="visionBoard" inverseEntity="PersonalValueEntity"/>
     </entity>
