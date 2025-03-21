@@ -59,56 +59,12 @@ class DashboardViewModel: ObservableObject {
         updateGreeting()
         fetchDailyChallenge()
         
-        // Lade Initial-Werte aus UserDefaults
+        // Lade Initial-Werte aus UserDefaults - hier ist wichtig,
+        // dass wir das nur einmal tun, bevor wir andere Aktualisierungen starten
         fetchStreakCount()
+        print("✓ DashboardViewModel: Streak initial geladen: \(streakCount)")
         
-        // Berechne Streak und aktualisiere UI
-        Task {
-            // Kurze Verzögerung, um anderen Initialisierungen Zeit zu geben
-            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 Sekunden
-            
-            print("🔄 DashboardViewModel: Berechne Streak in der Initialisierung")
-            await MainActor.run {
-                // Direkte Berechnung mit JournalViewModel
-                let streakInfo = self.journalViewModel.calculateCurrentStreakWithStartDate()
-                print("✓ DashboardViewModel: Streak berechnet: \(streakInfo.streak) Tage, Startdatum: \(String(describing: streakInfo.startDate))")
-                
-                self.updateStreakCount(streakInfo.streak)
-                
-                // Streak-Startdatum aktualisieren
-                self.streakStartDate = streakInfo.startDate
-                
-                // Daten in UserDefaults speichern
-                UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
-                if let startDate = streakInfo.startDate {
-                    UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
-                }
-                
-                // journaledDays basierend auf dem Streak aktualisieren
-                if let startDate = streakInfo.startDate, streakInfo.streak > 0 {
-                    self.updateJournaledDaysFromStreak(startDate: startDate, count: streakInfo.streak)
-                }
-                
-                // Explizites UI-Update erzwingen
-                self.objectWillChange.send()
-            }
-        }
-        
-        // Verzögere den initialen Datenlade-Prozess, um sicherzustellen,
-        // dass andere Systeme (wie Auth) vollständig initialisiert sind
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.fetchLastJournalEntries()
-        }
-        
-        // Update greeting every minute to handle time changes
-        Timer.publish(every: 60, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.updateGreeting()
-            }
-            .store(in: &cancellables)
-            
-        // Auf Streak-Updates reagieren
+        // Registriere den Notification-Observer zuerst, damit wir keine Updates verpassen
         NotificationCenter.default.publisher(for: NSNotification.Name("StreakUpdated"))
             .sink { [weak self] notification in
                 if let streakCount = notification.userInfo?["streakCount"] as? Int {
@@ -131,6 +87,66 @@ class DashboardViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+            
+        // Update greeting every minute to handle time changes
+        Timer.publish(every: 60, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.updateGreeting()
+            }
+            .store(in: &cancellables)
+            
+        // Wenn wir bereits Streak-Informationen haben (aus UserDefaults),
+        // können wir sofort die journaledDays aktualisieren
+        if let startDate = self.streakStartDate, self.streakCount > 0 {
+            self.updateJournaledDaysFromStreak(startDate: startDate, count: self.streakCount)
+            print("✓ DashboardViewModel: JournaledDays initial aus gespeichertem Streak gesetzt")
+        }
+        
+        // Verzögere den initialen Datenlade-Prozess, um sicherzustellen,
+        // dass andere Systeme (wie Auth) vollständig initialisiert sind
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.fetchLastJournalEntries()
+        }
+        
+        // Berechne Streak und aktualisiere UI nach einer Verzögerung
+        // Dies stellt sicher, dass wir eine aktuelle Berechnung haben, selbst wenn
+        // die gespeicherten Werte veraltet sein sollten
+        Task {
+            // Längere Verzögerung, um anderen Initialisierungen Zeit zu geben
+            try? await Task.sleep(nanoseconds: 800_000_000) // 0.8 Sekunden
+            
+            print("🔄 DashboardViewModel: Berechne Streak in der Initialisierung")
+            let streakInfo = self.journalViewModel.calculateCurrentStreakWithStartDate()
+            print("✓ DashboardViewModel: Streak berechnet: \(streakInfo.streak) Tage, Startdatum: \(String(describing: streakInfo.startDate))")
+            
+            await MainActor.run {
+                // Nur aktualisieren, wenn sich der Streak wirklich geändert hat
+                if streakInfo.streak != self.streakCount || streakInfo.startDate != self.streakStartDate {
+                    self.updateStreakCount(streakInfo.streak)
+                
+                    // Streak-Startdatum aktualisieren
+                    self.streakStartDate = streakInfo.startDate
+                
+                    // Daten in UserDefaults speichern
+                    UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
+                    if let startDate = streakInfo.startDate {
+                        UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                    }
+                
+                    // journaledDays basierend auf dem Streak aktualisieren
+                    if let startDate = streakInfo.startDate, streakInfo.streak > 0 {
+                        self.updateJournaledDaysFromStreak(startDate: startDate, count: streakInfo.streak)
+                    }
+                
+                    // Explizites UI-Update erzwingen
+                    self.objectWillChange.send()
+                    print("✓ DashboardViewModel: UI nach initialer Streak-Berechnung aktualisiert")
+                } else {
+                    print("✓ DashboardViewModel: Keine Änderung in initialem Streak festgestellt")
+                }
+            }
+        }
     }
     
     private func updateJournaledDays() {
@@ -257,6 +273,10 @@ class DashboardViewModel: ObservableObject {
         
         print("🔄 DashboardViewModel: Lade Journal-Einträge für Benutzer \(userId)")
         
+        // Aktuelle Werte sichern, um unnötige Updates zu vermeiden
+        let currentStreakCount = self.streakCount
+        let currentStartDate = self.streakStartDate
+        
         Task {
             do {
                 // Zuerst versuchen wir, lokale Einträge zu laden
@@ -267,28 +287,40 @@ class DashboardViewModel: ObservableObject {
                     self.lastJournalEntries = entries.sorted(by: { $0.date > $1.date })
                     print("✓ DashboardViewModel: Journal-Einträge sortiert und in UI aktualisiert.")
                     
-                    // Aktualisiere journaledDays mit den neuen Einträgen
-                    self.updateJournaledDays()
-                    print("✓ DashboardViewModel: Journaled Days aktualisiert: \(self.journaledDaysThisWeek)")
+                    // Wenn wir bereits Streak-Daten haben und diese valide sind, bevorzugen wir diese
+                    // für die journaledDays-Berechnung, um Flickering zu vermeiden
+                    if currentStreakCount > 0 && currentStartDate != nil {
+                        // Behalte die vorhandenen journaledDays basierend auf dem Streak bei
+                        print("🔄 DashboardViewModel: Verwende bestehende Streak-Daten für journaledDays")
+                    } else {
+                        // Aktualisiere journaledDays mit den neuen Einträgen
+                        self.updateJournaledDays()
+                        print("✓ DashboardViewModel: Journaled Days aktualisiert: \(self.journaledDaysThisWeek)")
+                    }
                     
-                    // Berechne und aktualisiere auch den Streak
+                    // Berechne und aktualisiere nur dann den Streak, wenn er sich ändert
                     let streakInfo = self.journalViewModel.calculateCurrentStreakWithStartDate()
                     print("✓ DashboardViewModel: Streak berechnet: \(streakInfo.streak) Tage, Startdatum: \(String(describing: streakInfo.startDate))")
                     
-                    self.updateStreakCount(streakInfo.streak)
-                    
-                    // Streak-Startdatum aktualisieren
-                    self.streakStartDate = streakInfo.startDate
-                    print("✓ DashboardViewModel: Streak-Startdatum gesetzt: \(String(describing: self.streakStartDate))")
-                    
-                    // Daten in UserDefaults speichern
-                    UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
-                    if let startDate = streakInfo.startDate {
-                        UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                    // Nur aktualisieren, wenn sich der Streak wirklich geändert hat
+                    if streakInfo.streak != currentStreakCount || streakInfo.startDate != currentStartDate {
+                        self.updateStreakCount(streakInfo.streak)
+                        
+                        // Streak-Startdatum aktualisieren
+                        self.streakStartDate = streakInfo.startDate
+                        print("✓ DashboardViewModel: Streak-Startdatum gesetzt: \(String(describing: self.streakStartDate))")
+                        
+                        // Daten in UserDefaults speichern
+                        UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
+                        if let startDate = streakInfo.startDate {
+                            UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                        }
+                        
+                        // Explicit trigger UI update to ensure WeekProgressView is refreshed
+                        self.objectWillChange.send()
+                    } else {
+                        print("✓ DashboardViewModel: Keine Änderung in Streak-Daten festgestellt")
                     }
-                    
-                    // Explicit trigger UI update to ensure WeekProgressView is refreshed
-                    self.objectWillChange.send()
                 }
             } catch {
                 print("⚠️ Fehler beim Laden der Journal-Einträge: \(error.localizedDescription)")
@@ -344,42 +376,56 @@ class DashboardViewModel: ObservableObject {
     func refreshData() {
         print("🔄 DashboardViewModel.refreshData: Aktualisiere Dashboard-Daten")
         
-        // Lade Streak-Daten
-        fetchStreakCount()
+        // Zuerst überprüfen wir, ob wir bereits Daten haben, um unnötige Resets zu vermeiden
+        let currentJournaledDays = self.journaledDaysThisWeek
+        let currentStreakCount = self.streakCount
+        let currentStartDate = self.streakStartDate
         
-        // Berechne den Streak direkt mit dem JournalViewModel
+        print("🔄 DashboardViewModel.refreshData: Aktuelle Daten - Streak: \(currentStreakCount), Journaled Days: \(currentJournaledDays)")
+        
+        // Daten-Load-Prozess starten
         Task {
             // Kurze Verzögerung, um anderen Initialisierungen Zeit zu geben
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 Sekunden
             
             print("🔄 DashboardViewModel.refreshData: Berechne Streak mit JournalViewModel")
+            
+            // Berechne den Streak direkt mit dem JournalViewModel
+            let streakInfo = self.journalViewModel.calculateCurrentStreakWithStartDate()
+            print("✓ DashboardViewModel.refreshData: Streak berechnet: \(streakInfo.streak) Tage, Startdatum: \(String(describing: streakInfo.startDate))")
+            
             await MainActor.run {
-                let streakInfo = self.journalViewModel.calculateCurrentStreakWithStartDate()
-                print("✓ DashboardViewModel.refreshData: Streak berechnet: \(streakInfo.streak) Tage, Startdatum: \(String(describing: streakInfo.startDate))")
-                
-                self.updateStreakCount(streakInfo.streak)
-                
-                // Streak-Startdatum aktualisieren
-                self.streakStartDate = streakInfo.startDate
-                
-                // Daten in UserDefaults speichern
-                UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
-                if let startDate = streakInfo.startDate {
-                    UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                // Nur aktualisieren, wenn sich etwas geändert hat
+                if streakInfo.streak != currentStreakCount || streakInfo.startDate != currentStartDate {
+                    self.updateStreakCount(streakInfo.streak)
+                    
+                    // Streak-Startdatum aktualisieren
+                    self.streakStartDate = streakInfo.startDate
+                    
+                    // Daten in UserDefaults speichern
+                    UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
+                    if let startDate = streakInfo.startDate {
+                        UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                    }
+                    
+                    // journaledDays basierend auf dem Streak aktualisieren
+                    if let startDate = streakInfo.startDate, streakInfo.streak > 0 {
+                        self.updateJournaledDaysFromStreak(startDate: startDate, count: streakInfo.streak)
+                    }
+                    
+                    print("✓ DashboardViewModel.refreshData: UI aktualisiert mit neuen Streak-Daten")
+                    // Explizites UI-Update erzwingen nur, wenn sich etwas geändert hat
+                    self.objectWillChange.send()
+                } else {
+                    print("✓ DashboardViewModel.refreshData: Keine Änderungen in Streak-Daten erkannt, UI nicht aktualisiert")
                 }
-                
-                // journaledDays basierend auf dem Streak aktualisieren
-                if let startDate = streakInfo.startDate, streakInfo.streak > 0 {
-                    self.updateJournaledDaysFromStreak(startDate: startDate, count: streakInfo.streak)
-                }
-                
-                // Explizites UI-Update erzwingen
-                self.objectWillChange.send()
             }
         }
         
-        // Lade Journal-Einträge
-        fetchLastJournalEntries()
+        // Lade Journal-Einträge getrennt, um Konflikte zu minimieren
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.fetchLastJournalEntries()
+        }
     }
 }
 
