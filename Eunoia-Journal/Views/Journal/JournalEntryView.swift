@@ -191,7 +191,7 @@ struct JournalEntryView: View {
             learningNuggetSection
             imagesSection
         }
-        .navigationTitle(entry?.title ?? "Neuer Eintrag")
+        .navigationTitle(navigationTitle)
         .navigationBarItems(
             leading: cancelButton,
             trailing: HStack {
@@ -234,6 +234,13 @@ struct JournalEntryView: View {
         }
         .task {
             setupInitialState()
+        }
+        .onChange(of: viewModel.currentEntry) { newEntry in
+            if let entry = newEntry {
+                gratitude = entry.gratitude
+                highlight = entry.highlight
+                learning = entry.learning
+            }
         }
         .onChange(of: viewModel.currentLearningText) { newContent in
             // Entferne die automatische Übernahme
@@ -539,6 +546,19 @@ struct JournalEntryView: View {
                     handleError(error)
                 }
             }
+        }
+    }
+    
+    private var navigationTitle: String {
+        if let entry = entry {
+            // Formatiere das Datum
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateStyle = .medium
+            dateFormatter.timeStyle = .none
+            dateFormatter.locale = Locale(identifier: "de_DE")
+            return dateFormatter.string(from: entry.date)
+        } else {
+            return "Neuer Eintrag"
         }
     }
 }
