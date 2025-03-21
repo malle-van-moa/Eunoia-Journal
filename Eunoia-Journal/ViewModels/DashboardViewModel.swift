@@ -1,6 +1,9 @@
 import SwiftUI
 import Combine
+import FirebaseAuth
+import CoreData
 
+@available(iOS 17.0, *)
 class DashboardViewModel: ObservableObject {
     @Published var greeting: String = ""
     @Published var motivationalMessage: String = ""
@@ -12,6 +15,7 @@ class DashboardViewModel: ObservableObject {
     @Published var isStreakAnimating: Bool = false
     @Published var showingMissedDayAlert: Bool = false
     @Published var lastStreakCount: Int = 0
+    @Published var streakStartDate: Date? = nil
     
     private var cancellables = Set<AnyCancellable>()
     private let calendar = Calendar.current
@@ -19,6 +23,15 @@ class DashboardViewModel: ObservableObject {
     var currentWeekday: Int {
         // Convert Sunday = 1 to Monday = 1
         let weekday = calendar.component(.weekday, from: Date())
+        return weekday == 1 ? 7 : weekday - 1
+    }
+    
+    // Gibt den ersten Wochentag zurück, basierend auf dem Streak-Startdatum
+    // Wenn kein Streak-Startdatum vorhanden ist, wird Montag (1) zurückgegeben
+    var firstDisplayedWeekday: Int {
+        guard let startDate = streakStartDate else { return 1 }
+        let weekday = calendar.component(.weekday, from: startDate)
+        // Konvertiere von Sonntag = 1 zu Montag = 1 Format
         return weekday == 1 ? 7 : weekday - 1
     }
     
@@ -34,6 +47,24 @@ class DashboardViewModel: ObservableObject {
             .autoconnect()
             .sink { [weak self] _ in
                 self?.updateGreeting()
+            }
+            .store(in: &cancellables)
+            
+        // Auf Streak-Updates reagieren
+        NotificationCenter.default.publisher(for: NSNotification.Name("StreakUpdated"))
+            .sink { [weak self] notification in
+                if let streakCount = notification.userInfo?["streakCount"] as? Int {
+                    DispatchQueue.main.async {
+                        self?.updateStreakCount(streakCount)
+                    }
+                }
+                
+                if let startDate = notification.userInfo?["streakStartDate"] as? Date {
+                    DispatchQueue.main.async {
+                        self?.streakStartDate = startDate
+                        self?.updateJournaledDays()
+                    }
+                }
             }
             .store(in: &cancellables)
     }
@@ -146,10 +177,44 @@ class DashboardViewModel: ObservableObject {
     private func fetchStreakCount() {
         // TODO: Implement streak counting logic
         streakCount = UserDefaults.standard.integer(forKey: "journalStreak")
+        
+        // Streak-Startdatum laden, falls vorhanden
+        if let startDate = UserDefaults.standard.object(forKey: "journalStreakStartDate") as? Date {
+            streakStartDate = startDate
+        }
     }
     
     private func fetchLastJournalEntries() {
-        // TODO: Implement journal entries fetching logic
+        // JournalEntries aus dem Service laden
+        guard let userId = FirebaseAuth.Auth.auth().currentUser?.uid else { return }
+        
+        Task {
+            do {
+                // Zuerst versuchen wir, lokale Einträge zu laden
+                let entries = try await CoreDataManager.shared.fetchJournalEntries(for: userId)
+                
+                DispatchQueue.main.async {
+                    self.lastJournalEntries = entries.sorted(by: { $0.date > $1.date })
+                    self.updateJournaledDays()
+                    
+                    // Berechne und aktualisiere auch den Streak
+                    let journalViewModel = JournalViewModel()
+                    let streakInfo = journalViewModel.calculateCurrentStreakWithStartDate()
+                    self.updateStreakCount(streakInfo.streak)
+                    
+                    // Streak-Startdatum aktualisieren
+                    self.streakStartDate = streakInfo.startDate
+                    
+                    // Daten in UserDefaults speichern
+                    UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
+                    if let startDate = streakInfo.startDate {
+                        UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                    }
+                }
+            } catch {
+                print("⚠️ Fehler beim Laden der Journal-Einträge: \(error.localizedDescription)")
+            }
+        }
     }
     
     func updateMood(_ mood: Mood) {

@@ -167,6 +167,21 @@ class JournalViewModel: ObservableObject {
                 }
                 
                 self.journalEntries = entries
+                
+                // Nach dem Laden der Einträge den Streak und das Startdatum berechnen und speichern
+                let streakInfo = self.calculateCurrentStreakWithStartDate()
+                UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
+                
+                if let startDate = streakInfo.startDate {
+                    UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                }
+                
+                // Benachrichtigung für das Dashboard senden
+                var userInfo: [String: Any] = ["streakCount": streakInfo.streak]
+                if let startDate = streakInfo.startDate {
+                    userInfo["streakStartDate"] = startDate
+                }
+                NotificationCenter.default.post(name: NSNotification.Name("StreakUpdated"), object: nil, userInfo: userInfo)
             }
             .store(in: &cancellables)
     }
@@ -418,6 +433,21 @@ class JournalViewModel: ObservableObject {
                 } else {
                     self.journalEntries.insert(entryToSave, at: 0)
                 }
+                
+                // Nach dem Speichern den Streak neu berechnen und speichern
+                let streakInfo = self.calculateCurrentStreakWithStartDate()
+                UserDefaults.standard.set(streakInfo.streak, forKey: "journalStreak")
+                
+                if let startDate = streakInfo.startDate {
+                    UserDefaults.standard.set(startDate, forKey: "journalStreakStartDate")
+                }
+                
+                // Benachrichtigung für das Dashboard senden
+                var userInfo: [String: Any] = ["streakCount": streakInfo.streak]
+                if let startDate = streakInfo.startDate {
+                    userInfo["streakStartDate"] = startDate
+                }
+                NotificationCenter.default.post(name: NSNotification.Name("StreakUpdated"), object: nil, userInfo: userInfo)
             }
             
             // If online, sync with Firebase
@@ -623,6 +653,30 @@ class JournalViewModel: ObservableObject {
         }
         
         return streak
+    }
+    
+    // Erweiterte Methode, die sowohl die Streak-Länge als auch das Startdatum zurückgibt
+    func calculateCurrentStreakWithStartDate() -> (streak: Int, startDate: Date?) {
+        var streak = 0
+        let calendar = Calendar.current
+        var currentDate = calendar.startOfDay(for: Date())
+        var streakStartDate: Date? = nil
+        
+        while true {
+            let entriesForDate = entriesByDate(date: currentDate)
+            if entriesForDate.isEmpty {
+                break
+            }
+            
+            streak += 1
+            // Aktualisiere das Startdatum bei jedem gefundenen Tag
+            streakStartDate = currentDate
+            
+            // Gehe einen Tag zurück
+            currentDate = calendar.date(byAdding: .day, value: -1, to: currentDate) ?? Date()
+        }
+        
+        return (streak, streakStartDate)
     }
     
     #if canImport(JournalingSuggestions)

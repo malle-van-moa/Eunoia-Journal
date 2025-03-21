@@ -1,5 +1,6 @@
 import SwiftUI
 
+@available(iOS 17.0, *)
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @StateObject private var journalViewModel = JournalViewModel()
@@ -76,7 +77,8 @@ struct DashboardView: View {
                                         // Wochentags-Anzeige (linke 70%)
                                         WeekProgressView(
                                             journaledDays: viewModel.journaledDaysThisWeek,
-                                            currentDay: viewModel.currentWeekday
+                                            currentDay: viewModel.currentWeekday,
+                                            firstDayOfWeek: viewModel.firstDisplayedWeekday
                                         ) { day in
                                             viewModel.checkMissedDay(day)
                                         }
@@ -326,6 +328,7 @@ struct LastEntriesView: View {
     }
 }
 
+@available(iOS 17.0, *)
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
