@@ -38,6 +38,10 @@
             </array>
         </dict>
     </array>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
     <!-- Existing entries will be preserved -->
 </dict>
 </plist>

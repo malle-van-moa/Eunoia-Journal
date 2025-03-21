@@ -7,14 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2860DF2AB6BDE09D45B8404E /* Pods_Eunoia_JournalTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1879935F271446738CA591DF /* Pods_Eunoia_JournalTests.framework */; };
 		67510D732D4AA49D00A63CEC /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 67510D722D4AA49D00A63CEC /* FirebaseAnalytics */; };
 		67510D752D4AA5C900A63CEC /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 67510D742D4AA5C900A63CEC /* FirebaseAuth */; };
 		67510D772D4AA5C900A63CEC /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 67510D762D4AA5C900A63CEC /* FirebaseFirestore */; };
 		67510D792D4AA5C900A63CEC /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 67510D782D4AA5C900A63CEC /* FirebaseStorage */; };
+		6755175A2D85D20C0081D5F7 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 675517592D85D20C0081D5F7 /* GoogleSignIn */; };
 		6780B8E22D6BAED800CD9EEF /* AdSupport.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6780B8E12D6BAED800CD9EEF /* AdSupport.framework */; };
-		9DD0AA0DF7EBD4AA2473EA94 /* Pods_Eunoia_JournalUITests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1FAC8AAECAF8A813DD940B2A /* Pods_Eunoia_JournalUITests.framework */; };
-		B2C02DC050430691B2B28EC4 /* Pods_Eunoia_Journal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 61F31860CA0EA812C9786026 /* Pods_Eunoia_Journal.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -35,22 +33,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		1879935F271446738CA591DF /* Pods_Eunoia_JournalTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Eunoia_JournalTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		1F038E884757860E18B507C8 /* Pods-Eunoia-Journal-Eunoia-JournalUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-Journal-Eunoia-JournalUITests.debug.xcconfig"; path = "Target Support Files/Pods-Eunoia-Journal-Eunoia-JournalUITests/Pods-Eunoia-Journal-Eunoia-JournalUITests.debug.xcconfig"; sourceTree = "<group>"; };
-		1FAC8AAECAF8A813DD940B2A /* Pods_Eunoia_JournalUITests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Eunoia_JournalUITests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		61F31860CA0EA812C9786026 /* Pods_Eunoia_Journal.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Eunoia_Journal.framework; sourceTree = BUILT_PRODUCTS_DIR; };
-		646692BDB24939E42F20BB6D /* Pods-Eunoia-JournalTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-JournalTests.debug.xcconfig"; path = "Target Support Files/Pods-Eunoia-JournalTests/Pods-Eunoia-JournalTests.debug.xcconfig"; sourceTree = "<group>"; };
 		674026A92D5F48E700453D85 /* Eunoia-Journal.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Eunoia-Journal.entitlements"; sourceTree = "<group>"; };
 		67510D422D4AA03700A63CEC /* Eunoia-Journal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Eunoia-Journal.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67510D522D4AA03900A63CEC /* Eunoia-JournalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Eunoia-JournalTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67510D5C2D4AA03900A63CEC /* Eunoia-JournalUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Eunoia-JournalUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6780B8E12D6BAED800CD9EEF /* AdSupport.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AdSupport.framework; path = System/Library/Frameworks/AdSupport.framework; sourceTree = SDKROOT; };
-		919FAA92F8718FA4C971D63E /* Pods-Eunoia-Journal.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-Journal.release.xcconfig"; path = "Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal.release.xcconfig"; sourceTree = "<group>"; };
-		9D70918D940D9298A86CDEDA /* Pods-Eunoia-JournalUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-JournalUITests.debug.xcconfig"; path = "Target Support Files/Pods-Eunoia-JournalUITests/Pods-Eunoia-JournalUITests.debug.xcconfig"; sourceTree = "<group>"; };
-		B5AA0D3F25C233724AFEDB86 /* Pods-Eunoia-JournalUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-JournalUITests.release.xcconfig"; path = "Target Support Files/Pods-Eunoia-JournalUITests/Pods-Eunoia-JournalUITests.release.xcconfig"; sourceTree = "<group>"; };
-		C0AB7679ECDA8474434CA1FC /* Pods-Eunoia-JournalTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-JournalTests.release.xcconfig"; path = "Target Support Files/Pods-Eunoia-JournalTests/Pods-Eunoia-JournalTests.release.xcconfig"; sourceTree = "<group>"; };
-		C2A6E2E64DE871CA33234866 /* Pods-Eunoia-Journal.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-Journal.debug.xcconfig"; path = "Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal.debug.xcconfig"; sourceTree = "<group>"; };
-		C7EEEDF539FE635620907C3A /* Pods-Eunoia-Journal-Eunoia-JournalUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Eunoia-Journal-Eunoia-JournalUITests.release.xcconfig"; path = "Target Support Files/Pods-Eunoia-Journal-Eunoia-JournalUITests/Pods-Eunoia-Journal-Eunoia-JournalUITests.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -93,8 +80,8 @@
 				67510D792D4AA5C900A63CEC /* FirebaseStorage in Frameworks */,
 				67510D752D4AA5C900A63CEC /* FirebaseAuth in Frameworks */,
 				67510D772D4AA5C900A63CEC /* FirebaseFirestore in Frameworks */,
-				B2C02DC050430691B2B28EC4 /* Pods_Eunoia_Journal.framework in Frameworks */,
 				6780B8E22D6BAED800CD9EEF /* AdSupport.framework in Frameworks */,
+				6755175A2D85D20C0081D5F7 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -102,7 +89,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2860DF2AB6BDE09D45B8404E /* Pods_Eunoia_JournalTests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,7 +96,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				9DD0AA0DF7EBD4AA2473EA94 /* Pods_Eunoia_JournalUITests.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,9 +106,6 @@
 			isa = PBXGroup;
 			children = (
 				6780B8E12D6BAED800CD9EEF /* AdSupport.framework */,
-				61F31860CA0EA812C9786026 /* Pods_Eunoia_Journal.framework */,
-				1879935F271446738CA591DF /* Pods_Eunoia_JournalTests.framework */,
-				1FAC8AAECAF8A813DD940B2A /* Pods_Eunoia_JournalUITests.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -154,14 +136,6 @@
 		C584C8EBAA3EDA550C5921CE /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				C2A6E2E64DE871CA33234866 /* Pods-Eunoia-Journal.debug.xcconfig */,
-				919FAA92F8718FA4C971D63E /* Pods-Eunoia-Journal.release.xcconfig */,
-				1F038E884757860E18B507C8 /* Pods-Eunoia-Journal-Eunoia-JournalUITests.debug.xcconfig */,
-				C7EEEDF539FE635620907C3A /* Pods-Eunoia-Journal-Eunoia-JournalUITests.release.xcconfig */,
-				646692BDB24939E42F20BB6D /* Pods-Eunoia-JournalTests.debug.xcconfig */,
-				C0AB7679ECDA8474434CA1FC /* Pods-Eunoia-JournalTests.release.xcconfig */,
-				9D70918D940D9298A86CDEDA /* Pods-Eunoia-JournalUITests.debug.xcconfig */,
-				B5AA0D3F25C233724AFEDB86 /* Pods-Eunoia-JournalUITests.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -173,11 +147,9 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 67510D662D4AA03900A63CEC /* Build configuration list for PBXNativeTarget "Eunoia-Journal" */;
 			buildPhases = (
-				87962730D1C3D37D10408460 /* [CP] Check Pods Manifest.lock */,
 				67510D3E2D4AA03700A63CEC /* Sources */,
 				67510D3F2D4AA03700A63CEC /* Frameworks */,
 				67510D402D4AA03700A63CEC /* Resources */,
-				0AC624AFFE9E008944BEA386 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -192,6 +164,7 @@
 				67510D742D4AA5C900A63CEC /* FirebaseAuth */,
 				67510D762D4AA5C900A63CEC /* FirebaseFirestore */,
 				67510D782D4AA5C900A63CEC /* FirebaseStorage */,
+				675517592D85D20C0081D5F7 /* GoogleSignIn */,
 			);
 			productName = "Eunoia-Journal";
 			productReference = 67510D422D4AA03700A63CEC /* Eunoia-Journal.app */;
@@ -201,7 +174,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 67510D692D4AA03900A63CEC /* Build configuration list for PBXNativeTarget "Eunoia-JournalTests" */;
 			buildPhases = (
-				8BA1D574A71A72C29FCDDE52 /* [CP] Check Pods Manifest.lock */,
 				67510D4E2D4AA03900A63CEC /* Sources */,
 				67510D4F2D4AA03900A63CEC /* Frameworks */,
 				67510D502D4AA03900A63CEC /* Resources */,
@@ -223,7 +195,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 67510D6C2D4AA03900A63CEC /* Build configuration list for PBXNativeTarget "Eunoia-JournalUITests" */;
 			buildPhases = (
-				94BC55EA0E4C873D9D450B04 /* [CP] Check Pods Manifest.lock */,
 				67510D582D4AA03900A63CEC /* Sources */,
 				67510D592D4AA03900A63CEC /* Frameworks */,
 				67510D5A2D4AA03900A63CEC /* Resources */,
@@ -281,6 +252,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				67510D712D4AA49D00A63CEC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				675517582D85D20C0081D5F7 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 67510D432D4AA03700A63CEC /* Products */;
@@ -317,92 +289,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		0AC624AFFE9E008944BEA386 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Eunoia-Journal/Pods-Eunoia-Journal-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		87962730D1C3D37D10408460 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Eunoia-Journal-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		8BA1D574A71A72C29FCDDE52 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Eunoia-JournalTests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		94BC55EA0E4C873D9D450B04 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-Eunoia-JournalUITests-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		67510D3E2D4AA03700A63CEC /* Sources */ = {
@@ -563,7 +449,6 @@
 		};
 		67510D672D4AA03900A63CEC /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = C2A6E2E64DE871CA33234866 /* Pods-Eunoia-Journal.debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -582,8 +467,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"${PODS_ROOT}/**",
-					"${PODS_XCFRAMEWORKS_BUILD_DIR}/**",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Eunoia-Journal/Info.plist";
@@ -614,7 +498,6 @@
 		};
 		67510D682D4AA03900A63CEC /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 919FAA92F8718FA4C971D63E /* Pods-Eunoia-Journal.release.xcconfig */;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = "$(inherited)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -633,8 +516,7 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
-					"${PODS_ROOT}/**",
-					"${PODS_XCFRAMEWORKS_BUILD_DIR}/**",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Eunoia-Journal/Info.plist";
@@ -665,7 +547,6 @@
 		};
 		67510D6A2D4AA03900A63CEC /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 646692BDB24939E42F20BB6D /* Pods-Eunoia-JournalTests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -685,7 +566,6 @@
 		};
 		67510D6B2D4AA03900A63CEC /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = C0AB7679ECDA8474434CA1FC /* Pods-Eunoia-JournalTests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -705,7 +585,6 @@
 		};
 		67510D6D2D4AA03900A63CEC /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 9D70918D940D9298A86CDEDA /* Pods-Eunoia-JournalUITests.debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -723,7 +602,6 @@
 		};
 		67510D6E2D4AA03900A63CEC /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B5AA0D3F25C233724AFEDB86 /* Pods-Eunoia-JournalUITests.release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -789,6 +667,14 @@
 				minimumVersion = 11.7.0;
 			};
 		};
+		675517582D85D20C0081D5F7 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -811,6 +697,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 67510D712D4AA49D00A63CEC /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		675517592D85D20C0081D5F7 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 675517582D85D20C0081D5F7 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
