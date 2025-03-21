@@ -177,8 +177,14 @@ class DashboardViewModel: ObservableObject {
         calendar.firstWeekday = 2 // Monday
         
         guard let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date())),
-              let targetDate = calendar.date(byAdding: .day, value: day - 1, to: startOfWeek),
-              targetDate < Date() else { return }
+              let targetDate = calendar.date(byAdding: .day, value: day - 1, to: startOfWeek) else { return }
+        
+        // Zusätzliche Überprüfung: Zeige keinen Alert für zukünftige Tage
+        let currentDate = Date()
+        guard targetDate < currentDate else { 
+            print("Kein Alert für zukünftigen Tag \(day)")
+            return 
+        }
         
         showingMissedDayAlert = true
     }

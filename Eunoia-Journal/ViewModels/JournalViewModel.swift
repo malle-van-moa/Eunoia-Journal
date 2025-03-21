@@ -388,6 +388,15 @@ class JournalViewModel: ObservableObject {
     func createNewEntry() {
         guard let userId = Auth.auth().currentUser?.uid else { return }
         
+        // Prüfe, ob bereits ein Eintrag für heute existiert
+        let today = Calendar.current.startOfDay(for: Date())
+        if let existingEntry = journalEntries.first(where: { Calendar.current.isDate($0.date, inSameDayAs: today) }) {
+            // Wenn ein Eintrag existiert, setze diesen als currentEntry und aktualisiere alle Felder
+            currentEntry = existingEntry
+            currentLearningText = existingEntry.learning
+            return
+        }
+        
         let newEntry = JournalEntry(
             id: UUID().uuidString,
             userId: userId,
@@ -406,6 +415,19 @@ class JournalViewModel: ObservableObject {
     
     func saveEntry(_ entry: JournalEntry) {
         var entryToSave = entry
+        
+        // Prüfe, ob bereits ein anderer Eintrag für das gleiche Datum existiert
+        let entryDate = Calendar.current.startOfDay(for: entry.date)
+        if let existingEntry = journalEntries.first(where: { 
+            Calendar.current.isDate($0.date, inSameDayAs: entryDate) && $0.id != entry.id 
+        }) {
+            // Wenn ein anderer Eintrag existiert, lösche diesen
+            do {
+                try deleteEntry(existingEntry)
+            } catch {
+                print("Error deleting existing entry: \(error)")
+            }
+        }
         
         // Wenn ein Learning vorhanden ist, aber kein LearningNugget, erstellen wir eines
         if !entry.learning.isEmpty && entry.learningNugget == nil {
