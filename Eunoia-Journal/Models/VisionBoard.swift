@@ -201,33 +201,39 @@ extension VisionBoard {
         self.id = entity.id
         self.userId = entity.userId ?? ""
         self.lastModified = entity.lastModified ?? Date()
-        self.syncStatus = SyncStatus(rawValue: entity.syncStatus ?? "pendingUpload") ?? .pendingUpload
+        self.syncStatus = SyncStatus(rawValue: entity.syncStatus ?? "") ?? .pendingUpload
         
         // Convert personal values
-        self.personalValues = entity.personalValues?.compactMap { value in
-            guard let value = value as? PersonalValueEntity else { return nil }
-            return PersonalValue(
-                id: value.id ?? UUID().uuidString,
-                name: value.name ?? "",
-                description: value.valueDescription ?? "",
-                importance: Int(value.importance)
-            )
-        } ?? []
+        if let valueEntities = entity.personalValues as? Set<PersonalValueEntity> {
+            self.personalValues = valueEntities.map { entity in
+                PersonalValue(
+                    id: entity.id ?? UUID().uuidString,
+                    name: entity.name ?? "",
+                    description: entity.valueDescription ?? "",
+                    importance: Int(entity.importance)
+                )
+            }
+        } else {
+            self.personalValues = []
+        }
         
         // Convert goals
-        self.goals = entity.goals?.compactMap { goal in
-            guard let goal = goal as? GoalEntity else { return nil }
-            return Goal(
-                id: goal.id ?? UUID().uuidString,
-                title: goal.title ?? "",
-                description: goal.goalDescription ?? "",
-                category: Goal.Category(rawValue: goal.category ?? "") ?? .personal,
-                targetDate: goal.targetDate,
-                priority: Int(goal.priority)
-            )
-        } ?? []
+        if let goalEntities = entity.goals as? Set<GoalEntity> {
+            self.goals = goalEntities.map { entity in
+                Goal(
+                    id: entity.id ?? UUID().uuidString,
+                    title: entity.title ?? "",
+                    description: entity.goalDescription ?? "",
+                    category: Goal.Category(rawValue: entity.category ?? "") ?? .personal,
+                    targetDate: entity.targetDate,
+                    priority: Int(entity.priority)
+                )
+            }
+        } else {
+            self.goals = []
+        }
         
-        // Convert lifestyle vision
+        // Konvertiere Lifestyle-Vision
         self.lifestyleVision = LifestyleVision(
             dailyRoutine: entity.lifestyleDailyRoutine ?? "",
             livingEnvironment: entity.lifestyleLivingEnvironment ?? "",
@@ -237,7 +243,7 @@ extension VisionBoard {
             health: entity.lifestyleHealth ?? ""
         )
         
-        // Convert desired personality
+        // Konvertiere Desired Personality
         self.desiredPersonality = DesiredPersonality(
             traits: entity.personalityTraits ?? "",
             mindset: entity.personalityMindset ?? "",
@@ -247,7 +253,7 @@ extension VisionBoard {
             growth: entity.personalityGrowth ?? ""
         )
         
-        // ValueCompass wird später implementiert
-        self.valueCompass = nil
+        // Konvertiere ValueCompass mit dem definierten Accessor
+        self.valueCompass = entity.valueCompass
     }
 } 

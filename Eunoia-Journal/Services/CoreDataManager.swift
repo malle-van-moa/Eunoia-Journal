@@ -372,6 +372,9 @@ class CoreDataManager {
             entity.personalityHabits = visionBoard.desiredPersonality.habits
             entity.personalityGrowth = visionBoard.desiredPersonality.growth
             
+            // Speichere ValueCompass, falls vorhanden
+            entity.valueCompass = visionBoard.valueCompass
+            
             // Save personal values
             visionBoard.personalValues.forEach { value in
                 let valueEntity = PersonalValueEntity(context: context)
