@@ -47,6 +47,8 @@ struct WeekProgressView: View {
             }
             .frame(maxHeight: .infinity)
         }
+        // Wichtig: ID ändern, wenn sich der erste Tag ändert, damit SwiftUI die View neu erstellt
+        .id("weekView-\(firstDayOfWeek)")
     }
 }
 

@@ -208,6 +208,15 @@ struct DashboardView: View {
         .sheet(isPresented: $showingLastEntries) {
             LastEntriesView(entries: viewModel.lastJournalEntries)
         }
+        .navigationBarHidden(true)
+        .alert("Verpasster Tag", isPresented: $viewModel.showingMissedDayAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("An diesem Tag hast du noch keinen Journaleintrag erstellt. Du kannst das noch nachholen!")
+        }
+        .onAppear {
+            viewModel.refreshData()
+        }
     }
 }
 
