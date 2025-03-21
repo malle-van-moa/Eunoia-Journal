@@ -86,6 +86,24 @@ class VisionBoardService {
         ]
         dict["desiredPersonality"] = desiredPersonalityData
         
+        // Konvertiere und speichere das ValueCompass, falls vorhanden
+        if let valueCompass = updatedVisionBoard.valueCompass {
+            let valueCompassEntries = valueCompass.values.map { entry -> [String: Any] in
+                return [
+                    "name": entry.name,
+                    "importance": entry.importance,
+                    "satisfaction": entry.satisfaction
+                ]
+            }
+            
+            let valueCompassData: [String: Any] = [
+                "values": valueCompassEntries,
+                "lastUpdated": Timestamp(date: valueCompass.lastUpdated)
+            ]
+            
+            dict["valueCompass"] = valueCompassData
+        }
+        
         try await db.collection("visionBoards").document(documentId).setData(dict)
         
         // Update local vision board status to synced
@@ -204,6 +222,36 @@ class VisionBoardService {
             )
         }
         
+        // Extract ValueCompass
+        var valueCompass: ValueCompass? = nil
+        if let compassData = data["valueCompass"] as? [String: Any],
+           let compassValues = compassData["values"] as? [[String: Any]],
+           let lastUpdatedTimestamp = compassData["lastUpdated"] as? Timestamp {
+            
+            // Konvertiere die Werte-Einträge
+            let radarEntries = compassValues.compactMap { entryData -> RadarChartEntry? in
+                guard let name = entryData["name"] as? String,
+                      let importance = entryData["importance"] as? Int,
+                      let satisfaction = entryData["satisfaction"] as? Int else {
+                    return nil
+                }
+                
+                return RadarChartEntry(
+                    name: name,
+                    importance: importance,
+                    satisfaction: satisfaction
+                )
+            }
+            
+            // Nur erstellen, wenn mindestens ein gültiger Wert vorhanden ist
+            if !radarEntries.isEmpty {
+                valueCompass = ValueCompass(
+                    values: radarEntries,
+                    lastUpdated: lastUpdatedTimestamp.dateValue()
+                )
+            }
+        }
+        
         return VisionBoard(
             id: document.documentID,
             userId: userId,
@@ -212,7 +260,8 @@ class VisionBoardService {
             goals: goals,
             lifestyleVision: lifestyleVision,
             desiredPersonality: desiredPersonality,
-            syncStatus: syncStatus
+            syncStatus: syncStatus,
+            valueCompass: valueCompass
         )
     }
     
@@ -376,6 +425,36 @@ class VisionBoardService {
                     )
                 }
                 
+                // Extract ValueCompass
+                var valueCompass: ValueCompass? = nil
+                if let compassData = data["valueCompass"] as? [String: Any],
+                   let compassValues = compassData["values"] as? [[String: Any]],
+                   let lastUpdatedTimestamp = compassData["lastUpdated"] as? Timestamp {
+                    
+                    // Konvertiere die Werte-Einträge
+                    let radarEntries = compassValues.compactMap { entryData -> RadarChartEntry? in
+                        guard let name = entryData["name"] as? String,
+                              let importance = entryData["importance"] as? Int,
+                              let satisfaction = entryData["satisfaction"] as? Int else {
+                            return nil
+                        }
+                        
+                        return RadarChartEntry(
+                            name: name,
+                            importance: importance,
+                            satisfaction: satisfaction
+                        )
+                    }
+                    
+                    // Nur erstellen, wenn mindestens ein gültiger Wert vorhanden ist
+                    if !radarEntries.isEmpty {
+                        valueCompass = ValueCompass(
+                            values: radarEntries,
+                            lastUpdated: lastUpdatedTimestamp.dateValue()
+                        )
+                    }
+                }
+                
                 let visionBoard = VisionBoard(
                     id: document.documentID,
                     userId: userId,
@@ -384,7 +463,8 @@ class VisionBoardService {
                     goals: goals,
                     lifestyleVision: lifestyleVision,
                     desiredPersonality: desiredPersonality,
-                    syncStatus: syncStatus
+                    syncStatus: syncStatus,
+                    valueCompass: valueCompass
                 )
                 
                 subject.send(visionBoard)

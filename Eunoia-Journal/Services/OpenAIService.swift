@@ -110,9 +110,9 @@ actor OpenAIService {
                     
                     switch code {
                     case "invalid_api_key":
-                        throw OpenAIError.authenticationError
-                    case "rate_limit_exceeded":
-                        throw OpenAIError.rateLimitExceeded
+                        throw ServiceError.aiServiceUnavailable
+                    case "rate_limit_exceeded", "quota_exceeded", "billing_quota_exceeded":
+                        throw ServiceError.apiQuotaExceeded
                     case "model_not_found":
                         // Fallback auf gpt-3.5-turbo wenn gpt-4 nicht verfügbar
                         let fallbackBody = try? JSONSerialization.data(withJSONObject: [
@@ -127,10 +127,21 @@ actor OpenAIService {
                         request.httpBody = fallbackBody
                         return try await generateText(prompt: prompt)
                     default:
-                        throw OpenAIError.apiError("\(code): \(message)")
+                        throw ServiceError.aiGeneration("\(code): \(message)")
                     }
                 }
-                throw OpenAIError.apiError("Status Code: \(httpResponse.statusCode)")
+                
+                // Generic error handling based on HTTP status code
+                switch httpResponse.statusCode {
+                case 401, 403:
+                    throw ServiceError.aiServiceUnavailable
+                case 429:
+                    throw ServiceError.apiQuotaExceeded
+                case 500, 502, 503, 504:
+                    throw ServiceError.aiServiceUnavailable
+                default:
+                    throw ServiceError.aiGeneration("HTTP Fehler \(httpResponse.statusCode)")
+                }
             }
             
             #if DEBUG
