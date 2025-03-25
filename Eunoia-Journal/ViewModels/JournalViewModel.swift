@@ -1128,6 +1128,85 @@ class JournalViewModel: ObservableObject {
             }
         }
     }
+    
+    // MARK: - Neue Funktionen für Bildverwaltung
+    
+    /// Löscht ein einzelnes Bild aus dem Firebase Storage mit umfangreicher Protokollierung
+    /// - Parameter url: Die URL des zu löschenden Bildes
+    func deleteCloudImage(url: String) async throws {
+        guard !url.isEmpty else {
+            logger.warning("[JournalViewModel] ⚠️ Leere URL kann nicht gelöscht werden")
+            throw NSError(domain: "JournalViewModel", code: 1001, userInfo: [
+                NSLocalizedDescriptionKey: "Die URL ist leer und kann nicht gelöscht werden"
+            ])
+        }
+        
+        // Validiere die URL-Struktur für Firebase Storage
+        if !url.contains("firebasestorage.googleapis.com") {
+            logger.warning("[JournalViewModel] ⚠️ URL scheint keine Firebase Storage URL zu sein: \(url)")
+            // Wir fahren trotzdem fort, da es auch eine URL zu einem anderen Storage-System sein könnte
+        }
+        
+        logger.debug("[JournalViewModel] 🔄 Starte Löschung des Bildes aus Cloud Storage: \(url)")
+        
+        do {
+            // Starte Timer für Performance-Messung
+            let startTime = Date()
+            
+            // Verwende das ImageService zum Löschen des Bildes
+            try await imageService.deleteImage(url: url)
+            
+            // Berechne die verstrichene Zeit
+            let elapsedTime = Date().timeIntervalSince(startTime)
+            logger.debug("[JournalViewModel] ✅ Bild erfolgreich aus Cloud Storage gelöscht: \(url) (Dauer: \(String(format: "%.2f", elapsedTime))s)")
+            
+            // Verifiziere Löschung, wenn möglich - in einem realen Szenario könntest du hier prüfen, ob das Bild wirklich gelöscht wurde
+            logger.debug("[JournalViewModel] 🔍 Löschung erfolgreich abgeschlossen, Bild sollte nicht mehr in Storage verfügbar sein")
+        } catch {
+            // Detaillierte Fehlerprotokolle
+            logger.error("[JournalViewModel] ❌ Fehler beim Löschen des Bildes aus Cloud Storage: \(error.localizedDescription)")
+            
+            // Kategorisiere und protokolliere spezifische Fehlertypen
+            if let nsError = error as? NSError {
+                switch nsError.code {
+                case 404:
+                    logger.error("[JournalViewModel] ❌ Bild wurde nicht gefunden (404): \(url)")
+                case 403:
+                    logger.error("[JournalViewModel] ❌ Keine Berechtigung zum Löschen (403): \(url)")
+                case -1009:
+                    logger.error("[JournalViewModel] ❌ Netzwerkfehler beim Löschen: \(url)")
+                default:
+                    logger.error("[JournalViewModel] ❌ Unbekannter Fehler (\(nsError.code)): \(url)")
+                }
+            }
+            
+            // Werfe den Fehler, damit die aufrufende Funktion ihn behandeln kann
+            throw error
+        }
+    }
+    
+    /// Speichert einen Eintrag direkt in CoreData, ohne andere Aktionen
+    /// - Parameter entry: Der zu speichernde Eintrag
+    func persistChanges(entry: JournalEntry) throws {
+        logger.debug("[JournalViewModel] Speichere Änderungen direkt in CoreData für Eintrag: \(entry.id ?? "unbekannt")")
+        
+        do {
+            // Speichere den Eintrag in CoreData
+            try coreDataManager.saveJournalEntry(entry)
+            
+            // Aktualisiere auch den Eintrag in der journalEntries-Liste
+            if let index = self.journalEntries.firstIndex(where: { $0.id == entry.id }) {
+                journalEntries[index] = entry
+                logger.debug("[JournalViewModel] Eintrag in Liste aktualisiert")
+            }
+            
+            // UI aktualisieren
+            objectWillChange.send()
+        } catch {
+            logger.error("[JournalViewModel] Fehler beim direkten Speichern in CoreData: \(error.localizedDescription)")
+            throw error
+        }
+    }
 }
 
 // MARK: - OpenAI Response Handling

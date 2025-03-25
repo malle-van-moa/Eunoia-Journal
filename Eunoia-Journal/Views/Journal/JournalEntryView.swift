@@ -42,10 +42,26 @@ struct JournalEntryView: View {
     
     private func setupInitialState() {
         if let entry = entry {
-            Task { @MainActor in
-                viewModel.currentEntry = entry
-            }
+            print("🔄 [SETUP] Initialisiere viewModel.currentEntry mit existierendem Entry (ID: \(entry.id ?? "unknown"))")
+            viewModel.currentEntry = JournalEntry(
+                id: entry.id,
+                userId: entry.userId,
+                date: entry.date,
+                gratitude: entry.gratitude,
+                highlight: entry.highlight,
+                learning: entry.learning,
+                learningNugget: entry.learningNugget,
+                lastModified: entry.lastModified,
+                syncStatus: entry.syncStatus,
+                title: entry.title,
+                content: entry.content,
+                location: entry.location,
+                imageURLs: entry.imageURLs,
+                localImagePaths: entry.localImagePaths,
+                images: entry.images
+            )
         } else {
+            print("🔄 [SETUP] Erstelle neuen Entry")
             Task { @MainActor in
                 viewModel.createNewEntry()
             }
@@ -235,8 +251,17 @@ struct JournalEntryView: View {
                 }
             }
         }
-        .task {
+        .onAppear {
+            print("🔄 [VIEW] onAppear ausgelöst")
             setupInitialState()
+        }
+        .task {
+            print("🔄 [VIEW] task ausgelöst")
+            // Bei einem bestehenden Eintrag muss die vollständige Initialisierung durchgeführt werden
+            if entry != nil && viewModel.currentEntry == nil {
+                print("⚠️ [VIEW] Wiederhole setupInitialState, da currentEntry nil ist")
+                setupInitialState()
+            }
         }
         .onChange(of: viewModel.currentEntry) { newEntry in
             if let entry = newEntry {
@@ -411,13 +436,93 @@ struct JournalEntryView: View {
     }
     
     private func deleteImage(_ url: String) {
-        guard var currentEntry = viewModel.currentEntry else { return }
+        print("📷 [DELETE-IMAGE] Lösche Bild mit URL: \(url)")
         
-        // Entferne die URL aus den imageURLs
-        currentEntry.imageURLs = currentEntry.imageURLs?.filter { $0 != url }
+        // Gesamten Bildzählerstand vor der Löschung protokollieren
+        let initialImageCount = (viewModel.currentEntry?.imageURLs?.count ?? 0) + selectedImages.count
+        print("📊 [DELETE-IMAGE] Bildanzahl VOR Löschung: \(initialImageCount)/\(maxImages)")
         
-        // Speichere den aktualisierten Eintrag
-        viewModel.saveEntry(currentEntry)
+        guard var currentEntry = viewModel.currentEntry else { 
+            print("❌ [DELETE-IMAGE] Kein aktueller Eintrag gefunden")
+            return 
+        }
+        
+        // Prüfe, ob der Entry Bilder hat
+        guard let imageUrls = currentEntry.imageURLs, !imageUrls.isEmpty else {
+            print("❌ [DELETE-IMAGE] Entry hat keine Bilder")
+            return
+        }
+        
+        // Finde den Index des zu löschenden Bildes
+        guard let index = imageUrls.firstIndex(where: { $0 == url }) else {
+            print("❌ [DELETE-IMAGE] URL nicht gefunden: \(url)")
+            return
+        }
+        
+        print("✓ [DELETE-IMAGE] URL gefunden an Position \(index): \(url)")
+        
+        // Entferne die URL
+        var updatedImageUrls = imageUrls
+        updatedImageUrls.remove(at: index)
+        
+        // Wenn noch lokale Pfade vorhanden sind, entferne auch den entsprechenden lokalen Pfad
+        if var localPaths = currentEntry.localImagePaths,
+           index < localPaths.count,
+           !localPaths.isEmpty {
+            let localPath = localPaths[index]
+            print("🗑 [DELETE-IMAGE] Entferne auch lokalen Pfad: \(localPath)")
+            localPaths.remove(at: index)
+            
+            // Aktualisiere die localImagePaths im Entry
+            currentEntry.localImagePaths = localPaths.isEmpty ? nil : localPaths
+        }
+        
+        // Aktualisiere die imageURLs im Entry
+        currentEntry.imageURLs = updatedImageUrls.isEmpty ? nil : updatedImageUrls
+        
+        // Protokolliere den neuen Zählerstand
+        let newURLsCount = currentEntry.imageURLs?.count ?? 0
+        print("📊 [DELETE-IMAGE] Neue URL-Anzahl: \(newURLsCount) (vorher: \(imageUrls.count))")
+        
+        // Lösche das Bild aus dem Storage und aktualisiere den Eintrag
+        Task {
+            do {
+                // Versuche das Bild aus dem Cloud Storage zu löschen
+                try await viewModel.deleteCloudImage(url: url)
+                print("✅ [DELETE-IMAGE] Bild aus Cloud Storage gelöscht: \(url)")
+            } catch {
+                print("⚠️ [DELETE-IMAGE] Fehler beim Löschen aus Cloud: \(error.localizedDescription)")
+                // Setze den Prozess fort, auch wenn das Löschen aus der Cloud fehlschlägt
+            }
+            
+            // Aktualisiere das ViewModel und die Datenbank
+            await MainActor.run {
+                do {
+                    // Speichere den aktualisierten Eintrag in CoreData
+                    try viewModel.persistChanges(entry: currentEntry)
+                    
+                    // Aktualisiere das viewModel mit dem neuen Entry
+                    viewModel.currentEntry = currentEntry
+                    
+                    // Aktualisiere auch den entry, von dem die View abhängt
+                    if let entryId = currentEntry.id, let entryIndex = viewModel.journalEntries.firstIndex(where: { $0.id == entryId }) {
+                        viewModel.journalEntries[entryIndex] = currentEntry
+                        print("✅ [DELETE-IMAGE] Auch journalEntries-Liste aktualisiert an Position \(entryIndex)")
+                    }
+                    
+                    // Sende explizit ein objectWillChange-Event, um die UI zu aktualisieren
+                    viewModel.objectWillChange.send()
+                    print("✅ [DELETE-IMAGE] UI-Aktualisierung angestoßen")
+                    
+                    // Protokolliere den finalen Zählerstand
+                    let finalImageCount = (viewModel.currentEntry?.imageURLs?.count ?? 0) + selectedImages.count
+                    print("📊 [DELETE-IMAGE] Bildanzahl NACH Löschung: \(finalImageCount)/\(maxImages)")
+                    print("📊 [DELETE-IMAGE] Erfolgreich \(initialImageCount - finalImageCount) Bild(er) entfernt")
+                } catch {
+                    print("❌ [DELETE-IMAGE] Fehler beim Aktualisieren in CoreData: \(error.localizedDescription)")
+                }
+            }
+        }
     }
     
     private func saveNewImages(_ images: [UIImage]) async {
@@ -463,27 +568,61 @@ struct JournalEntryView: View {
         }
     }
     
+    private func logImageCounter() {
+        let urlCount = viewModel.currentEntry?.imageURLs?.count ?? 0
+        let selectedCount = selectedImages.count
+        let currentImageCount = urlCount + selectedCount
+        print("📊 BILD-COUNTER - URLs: \(urlCount), ausstehend: \(selectedCount), gesamt: \(currentImageCount)/\(maxImages)")
+    }
+    
     private var imagesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // Hier die Debugausgaben in einer Methode aufrufen
+        let _ = logImageCounter()
+        
+        // Berechne die Anzahl für die Anzeige
+        let urlCount = viewModel.currentEntry?.imageURLs?.count ?? 0
+        let selectedCount = selectedImages.count
+        let currentImageCount = urlCount + selectedCount
+        
+        // Initialisiere currentEntry mit entry, falls noch nicht geschehen
+        if viewModel.currentEntry == nil && entry != nil {
+            viewModel.currentEntry = entry
+        }
+        
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Bilder")
                     .font(.headline)
+                
+                // Zeige Bilderzähler an
+                Text("\(currentImageCount)/\(maxImages)")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(currentImageCount >= maxImages ? .red : .secondary)
+                    .padding(.horizontal, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.secondary.opacity(0.1))
+                    )
+                    .animation(.easeInOut, value: currentImageCount)
+                    .id("counter-\(currentImageCount)") // Forciert View-Update bei Counter-Änderungen
+                
                 Spacer()
+                
                 if !isProcessingImages {
                     Button(action: {
                         selectedImages = []
                         showingImagePicker = true
                     }) {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.orange)
+                            .foregroundColor(currentImageCount >= maxImages ? .gray : .orange)
                     }
-                    .disabled(((viewModel.currentEntry?.imageURLs?.count ?? entry?.imageURLs?.count) ?? 0) + selectedImages.count >= maxImages)
+                    .disabled(currentImageCount >= maxImages)
                 }
             }
             
             // Lade und zeige bestehende URL-Bilder
-            let imageURLs = viewModel.currentEntry?.imageURLs ?? entry?.imageURLs
-            if let imageURLs = imageURLs, !imageURLs.isEmpty {
+            if let imageURLs = viewModel.currentEntry?.imageURLs, !imageURLs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(imageURLs, id: \.self) { url in
@@ -509,6 +648,7 @@ struct JournalEntryView: View {
                                 .padding(4),
                                 alignment: .topTrailing
                             )
+                            .id("image-\(url)") // Wichtig: Eindeutiger ID für jedes Bild
                         }
                     }
                     .padding(.horizontal, 4)
@@ -519,16 +659,45 @@ struct JournalEntryView: View {
             if !selectedImages.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(selectedImages, id: \.self) { image in
+                        ForEach(Array(selectedImages.enumerated()), id: \.element) { index, image in
                             Image(uiImage: image)
                                 .resizable()
                                 .scaledToFill()
                                 .frame(width: 100, height: 100)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                                // Füge auch hier einen Löschen-Button hinzu
+                                .overlay(
+                                    Button(action: {
+                                        // Entferne Bild aus ausgewählten Bildern
+                                        selectedImages.remove(at: index)
+                                        
+                                        // Aktualisiere die UI explizit durch Senden eines objectWillChange-Events
+                                        viewModel.objectWillChange.send()
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.white)
+                                            .background(Color.black.opacity(0.5))
+                                            .clipShape(Circle())
+                                    }
+                                    .padding(4),
+                                    alignment: .topTrailing
+                                )
                         }
                     }
                     .padding(.horizontal, 4)
                 }
+            }
+            
+            // Informationstext, wenn keine Bilder hinzugefügt wurden
+            if (viewModel.currentEntry?.imageURLs?.isEmpty ?? true) && selectedImages.isEmpty {
+                HStack {
+                    Spacer()
+                    Text("Keine Bilder hinzugefügt")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    Spacer()
+                }
+                .padding(.top, 4)
             }
         }
         .padding()
@@ -536,7 +705,22 @@ struct JournalEntryView: View {
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(selectedImages: $selectedImages, selectionLimit: maxImages - (viewModel.currentEntry?.imageURLs?.count ?? entry?.imageURLs?.count ?? 0))
+            // Berechne verbleibende Slots mit einzelnen Zwischenschritten
+            let existingImageCount = viewModel.currentEntry?.imageURLs?.count ?? 0
+            let totalSelected = existingImageCount + selectedImages.count
+            let remainingSlots = maxImages - totalSelected
+            let finalLimit = remainingSlots > 0 ? remainingSlots : 0
+            
+            ImagePicker(selectedImages: $selectedImages, selectionLimit: finalLimit)
+        }
+        .onChange(of: selectedImages) { newSelectedImages in
+            // Logge Änderungen an den ausgewählten Bildern
+            let urlCount = viewModel.currentEntry?.imageURLs?.count ?? 0
+            let selectedCount = newSelectedImages.count
+            print("📊 [IMAGE-SELECTION] Neue Bildauswahl: URLs: \(urlCount), ausstehend: \(selectedCount), gesamt: \(urlCount + selectedCount)/\(maxImages)")
+            
+            // Aktualisiere die UI explizit durch Senden eines objectWillChange-Events
+            viewModel.objectWillChange.send()
         }
     }
     
@@ -550,7 +734,12 @@ struct JournalEntryView: View {
             return
         }
         
-        // Verwende die neuesten Bildinformationen aus viewModel.currentEntry als primäre Quelle
+        // Verwende ausschließlich die aktuelle Bildliste aus dem ViewModel
+        let imageURLs = viewModel.currentEntry?.imageURLs
+        let localImagePaths = viewModel.currentEntry?.localImagePaths
+        
+        print("🔄 [SAVE] Speichere Eintrag mit \(imageURLs?.count ?? 0) Bild-URLs und \(localImagePaths?.count ?? 0) lokalen Pfaden")
+        
         let updatedEntry = JournalEntry(
             id: entry?.id ?? UUID().uuidString,
             userId: userId,
@@ -564,8 +753,8 @@ struct JournalEntryView: View {
             title: entry?.title,
             content: entry?.content,
             location: entry?.location,
-            imageURLs: viewModel.currentEntry?.imageURLs ?? entry?.imageURLs,
-            localImagePaths: viewModel.currentEntry?.localImagePaths ?? entry?.localImagePaths
+            imageURLs: imageURLs,  // Keine Fallback-Verwendung von entry?.imageURLs mehr
+            localImagePaths: localImagePaths  // Keine Fallback-Verwendung von entry?.localImagePaths mehr
         )
         
         print("Speichere Eintrag mit: \(updatedEntry.imageURLs?.count ?? 0) URLs und \(updatedEntry.localImagePaths?.count ?? 0) lokalen Pfaden")
