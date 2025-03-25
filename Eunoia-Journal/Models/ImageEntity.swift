@@ -11,16 +11,7 @@ public class ImageEntity: NSManagedObject, Identifiable {
     @NSManaged public var url: String?
     @NSManaged public var localPath: String?
     @NSManaged public var uploadDate: Date?
-    @NSManaged private var _journalEntry: CoreDataJournalEntry?
-    
-    public var journalEntry: CoreDataJournalEntry? {
-        get {
-            return _journalEntry
-        }
-        set {
-            _journalEntry = newValue
-        }
-    }
+    @NSManaged public var journalEntry: CoreDataJournalEntry?
     
     // Convenience initializer
     convenience init(context: NSManagedObjectContext, id: String, url: String? = nil, localPath: String? = nil) {
