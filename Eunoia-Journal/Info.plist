@@ -4,10 +4,18 @@
 <dict>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Eunoia benötigt Zugriff auf deine Fotos, um sie in deinen Journal-Einträgen zu speichern.</string>
+    <key>NSFileProviderDomainUsageDescription</key>
+    <string>Eunoia benötigt Zugriff auf deine Dateien, um Bilder in deinen Journal-Einträgen zu speichern.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Eunoia benötigt Zugriff auf deinen Standort, um ihn in deinen Journal-Einträgen zu speichern.</string>
     <key>NSLocationUsageDescription</key>
     <string>Eunoia verwendet deinen Standort für deine Journal-Einträge.</string>
+    <key>LSSupportsOpeningDocumentsInPlace</key>
+    <true/>
+    <key>UISupportsDocumentBrowser</key>
+    <true/>
+    <key>NSAllowsArbitraryLoadsInWebContent</key>
+    <true/>
     <key>GIDClientID</key>
     <string>190076633593-ts4rmhrf0rnvv2m9h337kamn3t2ig5kc.apps.googleusercontent.com</string>
     <key>CFBundleURLTypes</key>
