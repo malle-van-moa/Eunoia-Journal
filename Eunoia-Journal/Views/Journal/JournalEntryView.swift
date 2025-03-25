@@ -17,6 +17,8 @@ struct JournalEntryView: View {
     @State private var selectedImageIndex: Int?
     @State private var identifiableError: IdentifiableError?
     @State private var showingProcessingIndicator = false
+    @State private var showingImagePicker = false
+    @State private var isProcessingImages = false
     
     private let entry: JournalEntry?
     private let isEditing: Bool
@@ -51,7 +53,8 @@ struct JournalEntryView: View {
     }
     
     private func loadImages() -> [UIImage]? {
-        guard let localPaths = entry?.localImagePaths else {
+        // Verwende viewModel.currentEntry?.localImagePaths als primäre Datenquelle und entry?.localImagePaths als Fallback
+        guard let localPaths = viewModel.currentEntry?.localImagePaths ?? entry?.localImagePaths, !localPaths.isEmpty else {
             print("Keine lokalen Bildpfade gefunden")
             return nil 
         }
@@ -407,83 +410,133 @@ struct JournalEntryView: View {
         }
     }
     
+    private func deleteImage(_ url: String) {
+        guard var currentEntry = viewModel.currentEntry else { return }
+        
+        // Entferne die URL aus den imageURLs
+        currentEntry.imageURLs = currentEntry.imageURLs?.filter { $0 != url }
+        
+        // Speichere den aktualisierten Eintrag
+        viewModel.saveEntry(currentEntry)
+    }
+    
+    private func saveNewImages(_ images: [UIImage]) async {
+        guard !images.isEmpty else { return }
+        guard var currentEntry = viewModel.currentEntry else {
+            await MainActor.run {
+                showingProcessingIndicator = false
+                identifiableError = IdentifiableError(journalError: .saveError("Kein aktiver Eintrag gefunden"))
+            }
+            return
+        }
+        
+        // Sicherheitsmaßnahme: Überprüfe, ob alle Bilder gültig sind
+        let validImages = images.filter { $0.size.width > 0 && $0.size.height > 0 }
+        if validImages.count != images.count {
+            print("⚠️ Einige Bilder waren ungültig und wurden gefiltert")
+        }
+        
+        await MainActor.run {
+            isProcessingImages = true
+        }
+        
+        do {
+            // Speichere die neuen Bilder und erhalte die aktualisierten URLs
+            let savedEntry = try await viewModel.saveEntryWithImages(currentEntry, images: validImages)
+            
+            // Aktualisiere den currentEntry mit den neuen URLs
+            await MainActor.run {
+                viewModel.currentEntry = savedEntry
+                // Setze selectedImages zurück, da sie jetzt gespeichert sind
+                selectedImages = []
+                isProcessingImages = false
+                print("✅ Bilder erfolgreich gespeichert: \(savedEntry.imageURLs?.count ?? 0) URLs, \(savedEntry.localImagePaths?.count ?? 0) lokale Pfade")
+            }
+        } catch {
+            await MainActor.run {
+                isProcessingImages = false
+                print("❌ Fehler beim Speichern der Bilder: \(error.localizedDescription)")
+                handleError(error)
+                // Setze selectedImages zurück, um erneutes Speichern zu ermöglichen
+                selectedImages = []
+            }
+        }
+    }
+    
     private var imagesSection: some View {
-        Section(header: Text("Bilder")) {
-            VStack(alignment: .leading, spacing: 10) {
-                if !selectedImages.isEmpty {
-                    // Zeige ausgewählte Bilder, die noch nicht gespeichert wurden
-                    Text("Neue Bilder: \(selectedImages.count)")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
-                    ImageGalleryView(images: selectedImages) { index in
-                        selectedImages.remove(at: index)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Bilder")
+                    .font(.headline)
+                Spacer()
+                if !isProcessingImages {
+                    Button(action: {
+                        selectedImages = []
+                        showingImagePicker = true
+                    }) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.orange)
                     }
-                    .frame(height: 120)
-                } else if let loadedImages = loadImages(), !loadedImages.isEmpty {
-                    // Zeige lokale Bilder vom Gerät
-                    Text("Lokale Bilder: \(loadedImages.count)")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 10) {
-                            ForEach(0..<loadedImages.count, id: \.self) { index in
-                                Image(uiImage: loadedImages[index])
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .frame(height: 120)
-                } else if let entry = entry, let urls = entry.imageURLs, !urls.isEmpty {
-                    // Zeige Cloud-Bilder als Fallback
-                    Text("Cloud-Bilder: \(urls.count)")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        LazyHStack(spacing: 10) {
-                            ForEach(urls, id: \.self) { url in
-                                AsyncImage(url: URL(string: url)) { phase in
-                                    switch phase {
-                                    case .empty:
-                                        ProgressView()
-                                    case .success(let image):
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .frame(width: 100, height: 100)
-                                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    case .failure:
-                                        Image(systemName: "photo")
-                                            .foregroundColor(.gray)
-                                    @unknown default:
-                                        EmptyView()
-                                    }
-                                }
-                                .frame(width: 100, height: 100)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .frame(height: 120)
-                } else {
-                    Text("Keine Bilder vorhanden")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                
-                if selectedImages.count < maxImages {
-                    ImagePickerButton(
-                        selectedImages: $selectedImages,
-                        maxImages: maxImages
-                    )
+                    .disabled(((viewModel.currentEntry?.imageURLs?.count ?? entry?.imageURLs?.count) ?? 0) + selectedImages.count >= maxImages)
                 }
             }
+            
+            // Lade und zeige bestehende URL-Bilder
+            let imageURLs = viewModel.currentEntry?.imageURLs ?? entry?.imageURLs
+            if let imageURLs = imageURLs, !imageURLs.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(imageURLs, id: \.self) { url in
+                            AsyncImage(url: URL(string: url)) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 100, height: 100)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            } placeholder: {
+                                ProgressView()
+                                    .frame(width: 100, height: 100)
+                            }
+                            .overlay(
+                                Button(action: {
+                                    deleteImage(url)
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.white)
+                                        .background(Color.black.opacity(0.5))
+                                        .clipShape(Circle())
+                                }
+                                .padding(4),
+                                alignment: .topTrailing
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+            
+            // Lade und zeige ausgewählte neue Bilder
+            if !selectedImages.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(selectedImages, id: \.self) { image in
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(selectedImages: $selectedImages, selectionLimit: maxImages - (viewModel.currentEntry?.imageURLs?.count ?? entry?.imageURLs?.count ?? 0))
         }
     }
     
@@ -497,6 +550,7 @@ struct JournalEntryView: View {
             return
         }
         
+        // Verwende die neuesten Bildinformationen aus viewModel.currentEntry als primäre Quelle
         let updatedEntry = JournalEntry(
             id: entry?.id ?? UUID().uuidString,
             userId: userId,
@@ -510,12 +564,15 @@ struct JournalEntryView: View {
             title: entry?.title,
             content: entry?.content,
             location: entry?.location,
-            imageURLs: nil,
-            localImagePaths: nil
+            imageURLs: viewModel.currentEntry?.imageURLs ?? entry?.imageURLs,
+            localImagePaths: viewModel.currentEntry?.localImagePaths ?? entry?.localImagePaths
         )
+        
+        print("Speichere Eintrag mit: \(updatedEntry.imageURLs?.count ?? 0) URLs und \(updatedEntry.localImagePaths?.count ?? 0) lokalen Pfaden")
         
         Task {
             do {
+                // Wenn neue Bilder ausgewählt wurden
                 if !selectedImages.isEmpty {
                     let savedEntry = try await viewModel.saveEntryWithImages(updatedEntry, images: selectedImages)
                     print("Eintrag gespeichert mit URLs: \(String(describing: savedEntry.imageURLs))")
@@ -524,20 +581,14 @@ struct JournalEntryView: View {
                     await MainActor.run {
                         dismiss()
                     }
-                } else {
-                    // Wenn keine neuen Bilder ausgewählt wurden, aber der Eintrag bereits Bilder hat
-                    if let existingImages = loadImages(), !existingImages.isEmpty {
-                        let savedEntry = try await viewModel.saveEntryWithImages(updatedEntry, images: existingImages)
-                        print("Eintrag mit bestehenden Bildern gespeichert")
-                        
-                        await MainActor.run {
-                            dismiss()
-                        }
-                    } else {
-                        viewModel.saveEntry(updatedEntry)
-                        await MainActor.run {
-                            dismiss()
-                        }
+                } 
+                // Wenn keine neuen Bilder ausgewählt wurden, speichere nur den Text-Eintrag ohne Bilder zu verarbeiten
+                else {
+                    viewModel.saveEntry(updatedEntry)
+                    print("Eintrag ohne neue Bilder gespeichert")
+                    
+                    await MainActor.run {
+                        dismiss()
                     }
                 }
             } catch {

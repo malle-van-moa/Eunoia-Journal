@@ -235,41 +235,115 @@ struct JournalEntryRow: View {
         return formatter.string(from: entry.date)
     }
     
+    private var completionPercentage: Double {
+        var filledFields = 0
+        if !entry.gratitude.isEmpty { filledFields += 1 }
+        if !entry.highlight.isEmpty { filledFields += 1 }
+        if !entry.learning.isEmpty { filledFields += 1 }
+        return Double(filledFields) / 3.0
+    }
+    
+    private var imageCount: Int {
+        let urlCount = entry.imageURLs?.count ?? 0
+        let localCount = entry.localImagePaths?.count ?? 0
+        
+        // Wenn wir sowohl URLs als auch lokale Pfade haben, nehmen wir an, dass es sich um dieselben Bilder handelt
+        if urlCount > 0 && localCount > 0 {
+            return max(urlCount, localCount)
+        }
+        
+        // Andernfalls addieren wir beide Werte
+        return urlCount + localCount
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(entry.title ?? formattedDate)
-                .font(.headline)
-            
-            if let content = entry.content {
-                Text(content)
-                    .font(.subheadline)
-                    .lineLimit(2)
-            }
-            
-            if let location = entry.location {
-                HStack {
-                    Image(systemName: "location")
-                    Text(location)
-                        .font(.caption)
+        VStack(alignment: .leading, spacing: 12) {
+            // Datum und Bild-Indikator
+            HStack {
+                Text(formattedDate)
+                    .font(.headline)
+                
+                Spacer()
+                
+                if imageCount > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "camera.fill")
+                            .foregroundColor(.accentColor)
+                            .font(.system(size: 14))
+                        Text("\(imageCount)")
+                            .font(.caption)
+                            .foregroundColor(.accentColor)
+                    }
                 }
             }
             
-            if let learningNugget = entry.learningNugget {
-                JournalListLearningNuggetView(nugget: learningNugget)
-            }
-            
-            // Bilder-Anzeige mit Fallback-Logik
-            Group {
-                if let imageURLs = entry.imageURLs, !imageURLs.isEmpty {
-                    // Cloud-Bilder
-                    ImageScrollView(urls: imageURLs)
-                } else if let localPaths = entry.localImagePaths, !localPaths.isEmpty {
-                    // Lokale Bilder
-                    LocalImageScrollView(paths: localPaths)
+            // Fortschrittsbalken
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Hintergrund
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(.systemGray5))
+                        .frame(height: 4)
+                    
+                    // Fortschritt
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(completionColor)
+                        .frame(width: geometry.size.width * completionPercentage, height: 4)
                 }
+            }
+            .frame(height: 4)
+            
+            // Icons für ausgefüllte Felder
+            HStack(spacing: 16) {
+                FieldIcon(
+                    icon: "heart.fill",
+                    label: "Dankbarkeit",
+                    isFilled: !entry.gratitude.isEmpty
+                )
+                
+                FieldIcon(
+                    icon: "star.fill",
+                    label: "Highlight",
+                    isFilled: !entry.highlight.isEmpty
+                )
+                
+                FieldIcon(
+                    icon: "lightbulb.fill",
+                    label: "Lernen",
+                    isFilled: !entry.learning.isEmpty
+                )
             }
         }
         .padding(.vertical, 8)
+    }
+    
+    private var completionColor: Color {
+        switch completionPercentage {
+        case 0..<0.33:
+            return .orange
+        case 0.33..<0.66:
+            return .yellow
+        default:
+            return .green
+        }
+    }
+}
+
+struct FieldIcon: View {
+    let icon: String
+    let label: String
+    let isFilled: Bool
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .foregroundColor(isFilled ? .accentColor : .gray)
+                .font(.system(size: 14))
+            
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
     }
 }
 

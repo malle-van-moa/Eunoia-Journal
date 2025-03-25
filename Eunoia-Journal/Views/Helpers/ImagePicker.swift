@@ -1,15 +1,17 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
+import Photos
 
 struct ImagePicker: UIViewControllerRepresentable {
     @Binding var selectedImages: [UIImage]
     let selectionLimit: Int
     
     func makeUIViewController(context: Context) -> PHPickerViewController {
-        var config = PHPickerConfiguration()
+        var config = PHPickerConfiguration(photoLibrary: .shared())
         config.filter = .images
         config.selectionLimit = selectionLimit
-        config.preferredAssetRepresentationMode = .current
+        config.preferredAssetRepresentationMode = .compatible
         
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator
@@ -24,93 +26,135 @@ struct ImagePicker: UIViewControllerRepresentable {
     
     class Coordinator: NSObject, PHPickerViewControllerDelegate {
         let parent: ImagePicker
-        private var processingQueue = DispatchQueue(label: "com.eunoia.imageProcessing", qos: .userInitiated, attributes: .concurrent)
         
         init(_ parent: ImagePicker) {
             self.parent = parent
+            super.init()
         }
         
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
-            picker.dismiss(animated: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                picker.dismiss(animated: true)
+            }
             
             guard !results.isEmpty else { return }
             
-            let semaphore = DispatchSemaphore(value: 0)
-            var processedImages: [UIImage] = []
-            
-            var processedCount = 0
-            let totalCount = results.count
+            let dispatchGroup = DispatchGroup()
+            var loadedImages = [UIImage]()
             
             for result in results {
-                guard result.itemProvider.canLoadObject(ofClass: UIImage.self) else { 
-                    processedCount += 1
-                    if processedCount == totalCount {
-                        semaphore.signal()
-                    }
-                    continue 
-                }
+                dispatchGroup.enter()
                 
-                result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] (object, error) in
-                    defer {
-                        processedCount += 1
-                        if processedCount == totalCount {
-                            semaphore.signal()
+                if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                    result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, error in
+                        defer { dispatchGroup.leave() }
+                        
+                        guard let self = self else { return }
+                        
+                        if let error = error {
+                            print("Fehler beim direkten Laden des Bildes: \(error)")
+                            return
+                        }
+                        
+                        if let image = image as? UIImage {
+                            let processedImage = self.processImage(image)
+                            loadedImages.append(processedImage)
                         }
                     }
+                } else if let identifier = result.assetIdentifier {
+                    let options = PHImageRequestOptions()
+                    options.isNetworkAccessAllowed = true
+                    options.deliveryMode = .highQualityFormat
+                    options.resizeMode = .exact
+                    options.isSynchronous = false
                     
-                    guard let self = self else { return }
-                    
-                    if let error = error {
-                        print("Fehler beim Laden des Bildes: \(error)")
-                        return
+                    let assets = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+                    if let asset = assets.firstObject {
+                        PHImageManager.default().requestImage(
+                            for: asset,
+                            targetSize: PHImageManagerMaximumSize,
+                            contentMode: .default,
+                            options: options
+                        ) { [weak self] image, info in
+                            defer { dispatchGroup.leave() }
+                            
+                            guard let self = self, let image = image else { return }
+                            
+                            let processedImage = self.processImage(image)
+                            loadedImages.append(processedImage)
+                        }
+                    } else {
+                        dispatchGroup.leave()
                     }
-                    
-                    guard let image = object as? UIImage else {
-                        print("Konnte Objekt nicht als UIImage laden")
-                        return
+                } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                    result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { [weak self] url, error in
+                        defer { dispatchGroup.leave() }
+                        
+                        guard let self = self else { return }
+                        
+                        if let error = error {
+                            print("Fehler beim Laden der Bild-URL: \(error)")
+                            return
+                        }
+                        
+                        guard let url = url else {
+                            print("Keine URL erhalten")
+                            return
+                        }
+                        
+                        do {
+                            let imageData = try Data(contentsOf: url)
+                            if let image = UIImage(data: imageData) {
+                                let processedImage = self.processImage(image)
+                                loadedImages.append(processedImage)
+                            }
+                        } catch {
+                            print("Fehler beim Laden der Bild-Daten: \(error)")
+                        }
                     }
-                    
-                    let processedImage = self.processImage(image)
-                    processedImages.append(processedImage)
+                } else {
+                    print("Keine Methode zum Laden des Bildes verfügbar")
+                    dispatchGroup.leave()
                 }
             }
             
-            self.processingQueue.async {
-                let timeout = DispatchTime.now() + .seconds(30)
-                _ = semaphore.wait(timeout: timeout)
+            dispatchGroup.notify(queue: .main) { [weak self] in
+                guard let self = self else { return }
                 
-                DispatchQueue.main.async {
-                    let sortedImages = processedImages.sorted {
-                        $0.size.width * $0.size.height > $1.size.width * $1.size.height
+                if loadedImages.isEmpty {
+                    print("Keine Bilder konnten verarbeitet werden")
+                } else {
+                    let sortedImages = loadedImages.sorted { lhs, rhs in
+                        let lhsSize = lhs.size.width * lhs.size.height
+                        let rhsSize = rhs.size.width * rhs.size.height
+                        return lhsSize > rhsSize
                     }
                     
-                    self.parent.selectedImages.append(contentsOf: sortedImages)
+                    self.parent.selectedImages = sortedImages
+                    print("Erfolgreich \(sortedImages.count) Bilder geladen")
                 }
             }
         }
         
         private func processImage(_ image: UIImage) -> UIImage {
-            let maxDimension: CGFloat = 1024.0
-            let scale = min(maxDimension / image.size.width, maxDimension / image.size.height, 1.0)
+            let maxDimension: CGFloat = 2048.0
             
-            if scale < 1.0 {
-                let newSize = CGSize(
-                    width: image.size.width * scale,
-                    height: image.size.height * scale
-                )
+            if image.size.width > maxDimension || image.size.height > maxDimension {
+                let scale = maxDimension / max(image.size.width, image.size.height)
+                let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
                 
                 return autoreleasepool { () -> UIImage in
-                    UIGraphicsBeginImageContextWithOptions(newSize, false, 0.7)
+                    UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
                     defer { UIGraphicsEndImageContext() }
                     
                     image.draw(in: CGRect(origin: .zero, size: newSize))
-                    guard let scaledImage = UIGraphicsGetImageFromCurrentImageContext() else {
+                    guard let resizedImage = UIGraphicsGetImageFromCurrentImageContext() else {
                         return image
                     }
                     
-                    guard let jpegData = scaledImage.jpegData(compressionQuality: 0.7),
+                    guard let jpegData = resizedImage.jpegData(compressionQuality: 0.7),
                           let compressedImage = UIImage(data: jpegData) else {
-                        return scaledImage
+                        return resizedImage
                     }
                     
                     return compressedImage
