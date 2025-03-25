@@ -24,6 +24,7 @@ class JournalViewModel: ObservableObject {
     private let coreDataManager = CoreDataManager.shared
     private let learningNuggetService = LearningNuggetService.shared
     private let journalService = JournalService.shared
+    private let imageService = ImageService.shared
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "Eunoia", category: "JournalViewModel")
     private var cancellables = Set<AnyCancellable>()
     
@@ -444,6 +445,15 @@ class JournalViewModel: ObservableObject {
         // Set sync status based on network availability
         entryToSave.syncStatus = NetworkMonitor.shared.isConnected ? .synced : .pendingUpload
         
+        // Debug-Informationen für Bilder
+        if let imageURLs = entryToSave.imageURLs, !imageURLs.isEmpty {
+            logger.debug("[JournalViewModel] Eintrag speichern mit \(imageURLs.count) Bild-URLs")
+        }
+        
+        if let localPaths = entryToSave.localImagePaths, !localPaths.isEmpty {
+            logger.debug("[JournalViewModel] Eintrag speichern mit \(localPaths.count) lokalen Bildpfaden")
+        }
+        
         // Save to Core Data first
         do {
             try coreDataManager.saveJournalEntry(entryToSave)
@@ -452,8 +462,22 @@ class JournalViewModel: ObservableObject {
             DispatchQueue.main.async {
                 if let index = self.journalEntries.firstIndex(where: { $0.id == entryToSave.id }) {
                     self.journalEntries[index] = entryToSave
+                    
+                    // Debug-Informationen für aktualisierte Einträge
+                    if let id = entryToSave.id {
+                        self.logger.debug("[JournalViewModel] Eintrag aktualisiert mit ID: \(id)")
+                    }
+                    
+                    if let imageURLs = entryToSave.imageURLs, !imageURLs.isEmpty {
+                        self.logger.debug("[JournalViewModel] Aktualisierter Eintrag hat \(imageURLs.count) Bild-URLs")
+                    }
+                    
+                    if let localPaths = entryToSave.localImagePaths, !localPaths.isEmpty {
+                        self.logger.debug("[JournalViewModel] Aktualisierter Eintrag hat \(localPaths.count) lokale Bildpfade")
+                    }
                 } else {
                     self.journalEntries.insert(entryToSave, at: 0)
+                    self.logger.debug("[JournalViewModel] Neuer Eintrag in journalEntries eingefügt")
                 }
                 
                 // Nach dem Speichern den Streak neu berechnen und speichern
@@ -477,13 +501,14 @@ class JournalViewModel: ObservableObject {
                 Task {
                     do {
                         try await firebaseService.saveJournalEntry(entryToSave)
+                        self.logger.debug("[JournalViewModel] Eintrag erfolgreich mit Firebase synchronisiert")
                     } catch {
-                        print("Error saving entry to Firebase: \(error)")
+                        self.logger.error("[JournalViewModel] Error saving entry to Firebase: \(error)")
                     }
                 }
             }
         } catch {
-            print("Error saving entry to CoreData: \(error)")
+            self.logger.error("[JournalViewModel] Error saving entry to CoreData: \(error)")
         }
     }
     
@@ -763,77 +788,247 @@ class JournalViewModel: ObservableObject {
     }
     
     func saveEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
-        // Wenn der Eintrag bereits Bilder hat, lösche diese zuerst
-        if let existingUrls = entry.imageURLs {
-            try await journalService.deleteCloudImages(urls: existingUrls)
-        }
-        
-        // Lösche auch lokale Bilder, falls vorhanden
-        if let localPaths = entry.localImagePaths {
-            for path in localPaths {
-                // Bestimme, ob es sich um einen vollständigen oder relativen Pfad handelt
-                if path.hasPrefix("/") {
-                    // Vollständiger Pfad
-                    try? FileManager.default.removeItem(atPath: path)
-                } else {
-                    // Relativer Pfad
-                    if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                        let fullPath = documentsDirectory.appendingPathComponent(path).path
-                        try? FileManager.default.removeItem(atPath: fullPath)
+        do {
+            // Prüfe zuerst, ob für dieses Datum bereits ein Eintrag existiert (außer diesem)
+            let entryDate = Calendar.current.startOfDay(for: entry.date)
+            
+            // Sichere alle Einträge für denselben Tag in einer Liste
+            let entriesForSameDate = journalEntries.filter { 
+                Calendar.current.isDate($0.date, inSameDayAs: entryDate) && $0.id != entry.id 
+            }
+            
+            // Wenn ein anderer Eintrag für denselben Tag existiert, versuche diesen zu löschen
+            for existingEntry in entriesForSameDate {
+                logger.debug("[JournalViewModel] Gefunden: Bestehender Eintrag für denselben Tag mit ID: \(existingEntry.id ?? "unbekannt")")
+                
+                do {
+                    logger.debug("[JournalViewModel] Lösche bestehenden Eintrag für denselben Tag mit ID: \(existingEntry.id ?? "unbekannt")")
+                    try await deleteEntryWithImages(existingEntry)
+                } catch {
+                    // Wenn das Löschen fehlschlägt, loggen wir den Fehler, setzen aber den Prozess fort
+                    logger.error("[JournalViewModel] Fehler beim Löschen des existierenden Eintrags: \(error.localizedDescription)")
+                    logger.debug("[JournalViewModel] Fahre trotzdem mit dem Speichern des neuen Eintrags fort")
+                    
+                    // Lokale Kopie trotzdem entfernen, um Duplikate zu vermeiden
+                    await MainActor.run {
+                        journalEntries.removeAll { $0.id == existingEntry.id }
                     }
                 }
             }
-        }
-        
-        // Speichere den Eintrag mit den neuen Bildern
-        let updatedEntry = try await journalService.saveJournalEntryWithImages(entry: entry, images: images)
-        
-        // Aktualisiere den lokalen Cache
-        await MainActor.run {
-            if let index = journalEntries.firstIndex(where: { $0.id == updatedEntry.id }) {
-                journalEntries[index] = updatedEntry
+            
+            // Bilder speichern und hochladen
+            var updatedEntry: JournalEntry
+            do {
+                updatedEntry = try await journalService.saveJournalEntryWithImages(entry: entry, images: images)
+            } catch {
+                // Wenn der Cloud-Upload fehlschlägt, versuchen wir trotzdem, den Eintrag lokal zu speichern
+                logger.error("[JournalViewModel] Fehler beim Speichern des Eintrags mit Bildern in der Cloud: \(error.localizedDescription)")
+                
+                // Speichere Bilder lokal
+                var localImagePaths: [String] = entry.localImagePaths ?? []
+                for (index, image) in images.enumerated() {
+                    do {
+                        if let entryId = entry.id {
+                            let localPath = try await imageService.saveImageLocally(image, entryId: entryId)
+                            // Vermeidung von Duplikaten
+                            if !localImagePaths.contains(localPath) {
+                                localImagePaths.append(localPath)
+                                logger.debug("[JournalViewModel] Bild \(index) lokal gespeichert: \(localPath)")
+                            }
+                        }
+                    } catch {
+                        logger.error("[JournalViewModel] Fehler beim lokalen Speichern von Bild \(index): \(error.localizedDescription)")
+                    }
+                }
+                
+                // Aktualisiere den Eintrag mit lokalen Bildpfaden
+                updatedEntry = JournalEntry(
+                    id: entry.id,
+                    userId: entry.userId,
+                    date: entry.date,
+                    gratitude: entry.gratitude,
+                    highlight: entry.highlight,
+                    learning: entry.learning,
+                    learningNugget: entry.learningNugget,
+                    lastModified: Date(),
+                    syncStatus: .pendingUpload,
+                    title: entry.title,
+                    content: entry.content,
+                    location: entry.location,
+                    imageURLs: entry.imageURLs,
+                    localImagePaths: Array(Set(localImagePaths)), // Verwende Set für Eindeutigkeit
+                    images: entry.images
+                )
+                
+                // Speichere den Eintrag lokal
+                try coreDataManager.saveJournalEntry(updatedEntry)
+                logger.debug("[JournalViewModel] Eintrag lokal gespeichert mit \(localImagePaths.count) Bildpfaden")
             }
+            
+            // Stelle sicher, dass currentEntry aktualisiert wird
+            await MainActor.run {
+                // Bestehende Einträge für denselben Tag entfernen
+                journalEntries.removeAll { Calendar.current.isDate($0.date, inSameDayAs: entryDate) && $0.id != updatedEntry.id }
+                
+                self.currentEntry = updatedEntry
+                
+                // Aktualisiere auch den Eintrag in der journalEntries-Liste
+                if let index = self.journalEntries.firstIndex(where: { $0.id == updatedEntry.id }) {
+                    self.journalEntries[index] = updatedEntry
+                    self.logger.debug("[JournalViewModel] Eintrag in Liste aktualisiert mit \(updatedEntry.imageURLs?.count ?? 0) Bild-URLs und \(updatedEntry.localImagePaths?.count ?? 0) lokalen Pfaden")
+                } else {
+                    self.journalEntries.insert(updatedEntry, at: 0)
+                    self.logger.debug("[JournalViewModel] Neuer Eintrag mit Bildern zur Liste hinzugefügt")
+                }
+                
+                // UI aktualisieren
+                self.objectWillChange.send()
+            }
+            
+            return updatedEntry
+        } catch {
+            self.logger.error("[JournalViewModel] Fehler beim Speichern des Eintrags mit Bildern: \(error.localizedDescription)")
+            throw error
         }
-        
-        return updatedEntry
     }
     
     func deleteEntryWithImages(_ entry: JournalEntry) async throws {
-        // Lösche zuerst die Bilder, falls vorhanden
-        if let imageUrls = entry.imageURLs {
-            try await journalService.deleteCloudImages(urls: imageUrls)
-        }
+        // Speichere relevante Daten für den Fall, dass wir nur lokal löschen können
+        let entryId = entry.id
+        var failedCloudOperations = false
+        var localSuccess = false
         
-        // Lösche lokale Bilder
-        if let localPaths = entry.localImagePaths {
-            for path in localPaths {
-                // Bestimme, ob es sich um einen vollständigen oder relativen Pfad handelt
-                if path.hasPrefix("/") {
-                    // Vollständiger Pfad
-                    try? FileManager.default.removeItem(atPath: path)
-                } else {
-                    // Relativer Pfad
-                    if let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                        let fullPath = documentsDirectory.appendingPathComponent(path).path
-                        try? FileManager.default.removeItem(atPath: fullPath)
+        do {
+            // Lösche zuerst die Bilder, falls vorhanden
+            if let imageUrls = entry.imageURLs {
+                // Stelle sicher, dass keine nil-Werte in der URL-Liste vorhanden sind
+                let validUrls = imageUrls.compactMap { $0 }
+                if !validUrls.isEmpty {
+                    do {
+                        try await journalService.deleteCloudImages(urls: validUrls)
+                    } catch {
+                        logger.error("Fehler beim Löschen der Cloud-Bilder: \(error.localizedDescription)")
+                        failedCloudOperations = true
+                        // Wir fahren fort, trotz des Fehlers
                     }
                 }
             }
-        }
-        
-        // Dann lösche den Eintrag
-        if let id = entry.id {
-            try await journalService.deleteJournalEntry(withId: id)
             
-            // Aktualisiere den lokalen Cache
-            await MainActor.run {
-                journalEntries.removeAll { $0.id == id }
+            // Lösche lokale Bilder
+            if let localPaths = entry.localImagePaths, !localPaths.isEmpty {
+                do {
+                    try await Task {
+                        try await imageService.deleteLocalImages(paths: localPaths)
+                    }.value
+                } catch {
+                    logger.error("Fehler beim Löschen der lokalen Bilder: \(error.localizedDescription)")
+                    // Wir fahren fort, trotz des Fehlers
+                }
             }
+            
+            // Dann lösche den Eintrag in Firebase
+            if let id = entryId {
+                do {
+                    if NetworkMonitor.shared.isConnected {
+                        try await journalService.deleteJournalEntry(withId: id)
+                    } else {
+                        failedCloudOperations = true
+                    }
+                } catch {
+                    logger.error("Fehler beim Löschen des Eintrags in Firebase: \(error.localizedDescription)")
+                    failedCloudOperations = true
+                    // Wir versuchen trotzdem, den Eintrag lokal zu löschen
+                }
+                
+                // Aktualisiere lokale Daten unabhängig vom Cloud-Ergebnis
+                do {
+                    // Lösche aus Core Data
+                    try await coreDataManager.deleteJournalEntryAsync(withId: id)
+                    localSuccess = true
+                    
+                    // Aktualisiere den lokalen Cache
+                    await MainActor.run {
+                        journalEntries.removeAll { $0.id == id }
+                    }
+                } catch {
+                    logger.error("Fehler beim lokalen Löschen des Eintrags: \(error.localizedDescription)")
+                    throw error // Hier werfen wir den Fehler, da lokales Löschen kritisch ist
+                }
+            }
+            
+            // Wenn die Cloud-Operationen fehlgeschlagen sind, markieren wir den lokalen Eintrag als pendingDelete
+            if failedCloudOperations && localSuccess && NetworkMonitor.shared.isConnected {
+                logger.warning("Cloud-Löschung fehlgeschlagen, aber lokaler Eintrag wurde entfernt. Der Eintrag wird bei der nächsten Synchronisierung gelöscht.")
+                
+                do {
+                    try await queueEntryForDeletion(entryId: entryId)
+                } catch {
+                    logger.error("Fehler beim Queueing des Eintrags für spätere Löschung: \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            logger.error("Fehler beim Löschen des Eintrags mit Bildern: \(error.localizedDescription)")
+            throw error
+        }
+    }
+    
+    private func queueEntryForDeletion(entryId: String?) async throws {
+        guard let id = entryId else { return }
+        
+        // Speichere die ID des zu löschenden Eintrags in UserDefaults
+        var pendingDeletions = UserDefaults.standard.stringArray(forKey: "pendingEntryDeletions") ?? []
+        if !pendingDeletions.contains(id) {
+            pendingDeletions.append(id)
+            UserDefaults.standard.set(pendingDeletions, forKey: "pendingEntryDeletions")
         }
     }
     
     func updateEntryWithImages(_ entry: JournalEntry, images: [UIImage]) async throws -> JournalEntry {
-        return try await saveEntryWithImages(entry, images: images)
+        // Stelle sicher, dass keine neue ID vergeben wird, wenn wir einen existierenden Eintrag aktualisieren
+        var entryToUpdate = entry
+        
+        // Wenn der Eintrag keine ID hat, erstelle eine
+        if entryToUpdate.id == nil {
+            entryToUpdate = JournalEntry(
+                id: UUID().uuidString,
+                userId: entryToUpdate.userId,
+                date: entryToUpdate.date,
+                gratitude: entryToUpdate.gratitude,
+                highlight: entryToUpdate.highlight,
+                learning: entryToUpdate.learning,
+                learningNugget: entryToUpdate.learningNugget,
+                lastModified: Date(),
+                syncStatus: .pendingUpload,
+                title: entryToUpdate.title,
+                content: entryToUpdate.content,
+                location: entryToUpdate.location,
+                imageURLs: entryToUpdate.imageURLs,
+                localImagePaths: entryToUpdate.localImagePaths,
+                images: entryToUpdate.images
+            )
+        }
+        
+        // Aktualisiere das Änderungsdatum
+        entryToUpdate = JournalEntry(
+            id: entryToUpdate.id,
+            userId: entryToUpdate.userId,
+            date: entryToUpdate.date,
+            gratitude: entryToUpdate.gratitude,
+            highlight: entryToUpdate.highlight,
+            learning: entryToUpdate.learning,
+            learningNugget: entryToUpdate.learningNugget,
+            lastModified: Date(),
+            syncStatus: .pendingUpload,
+            title: entryToUpdate.title,
+            content: entryToUpdate.content,
+            location: entryToUpdate.location,
+            imageURLs: entryToUpdate.imageURLs,
+            localImagePaths: entryToUpdate.localImagePaths,
+            images: entryToUpdate.images
+        )
+        
+        // Verwende die existierende saveEntryWithImages-Methode
+        return try await saveEntryWithImages(entryToUpdate, images: images)
     }
     
     func updateCurrentEntry(with nugget: LearningNugget) {
@@ -867,7 +1062,10 @@ class JournalViewModel: ObservableObject {
             let response = try JSONDecoder().decode(OpenAIResponse.self, from: data)
             logger.debug("JSON erfolgreich decodiert. Erste Choice verfügbar: \(response.choices.first != nil)")
             
-            if let (title, content) = response.extractLearningContent() {
+            if let result = response.extractLearningContent() {
+                let title = result.0
+                let content = result.1
+                
                 logger.debug("Learning Content erfolgreich extrahiert:")
                 logger.debug("Titel: \(title)")
                 logger.debug("Content: \(content)")
@@ -917,6 +1115,16 @@ class JournalViewModel: ObservableObject {
                 if let stringRepresentation = String(data: data, encoding: .utf8) {
                     logger.debug("Rohdaten der fehlgeschlagenen Antwort: \(stringRepresentation)")
                 }
+            }
+        }
+    }
+    
+    private func deleteLocalImages(paths: [String]) {
+        Task {
+            do {
+                try await imageService.deleteLocalImages(paths: paths)
+            } catch {
+                logger.error("Fehler beim Löschen der lokalen Bilder: \(error.localizedDescription)")
             }
         }
     }

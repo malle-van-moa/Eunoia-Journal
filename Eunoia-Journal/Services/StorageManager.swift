@@ -61,7 +61,7 @@ class StorageManager {
             entryId = String(entryIdComponent)
         }
         
-        // Verwende den in den Firebase-Regeln definierten Pfad
+        // Verwende den korrekten Pfad basierend auf den Storage Rules
         let imagePath = "journal_images/\(userId)/\(entryId)/\(filename)"
         
         // Log zur Fehlersuche
@@ -88,23 +88,51 @@ class StorageManager {
         ]
         
         do {
-            _ = try await imageRef.putDataAsync(data, metadata: metadata)
-            let downloadURL = try await imageRef.downloadURL()
-            logger.info("Bild erfolgreich hochgeladen: \(downloadURL.absoluteString)")
-            return downloadURL.absoluteString
-        } catch let error as NSError {
-            switch error.code {
-            case StorageErrorCode.quotaExceeded.rawValue:
-                throw StorageError.quotaExceeded
-            case StorageErrorCode.retryLimitExceeded.rawValue:
-                throw StorageError.networkError
-            case StorageErrorCode.unauthorized.rawValue:
-                logger.error("Berechtigungsfehler: \(error.localizedDescription)")
-                throw StorageError.uploadFailed("Keine Berechtigung für den Zugriff auf den angegebenen Pfad. Bitte prüfe die Firebase Storage Regeln.")
-            default:
-                logger.error("Hochladefehler (\(error.code)): \(error.localizedDescription)")
-                throw StorageError.uploadFailed(error.localizedDescription)
+            // Versuche den Upload mit Retry-Logik
+            var retryCount = 0
+            let maxRetries = 3
+            var lastError: Error?
+            
+            while retryCount < maxRetries {
+                do {
+                    _ = try await imageRef.putDataAsync(data, metadata: metadata)
+                    let downloadURL = try await imageRef.downloadURL()
+                    logger.info("Bild erfolgreich hochgeladen: \(downloadURL.absoluteString)")
+                    return downloadURL.absoluteString
+                } catch {
+                    lastError = error
+                    retryCount += 1
+                    
+                    if retryCount < maxRetries {
+                        // Exponentielles Backoff
+                        let delay = pow(2.0, Double(retryCount))
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        logger.warning("Upload-Versuch \(retryCount) fehlgeschlagen, versuche erneut in \(delay) Sekunden")
+                    }
+                }
             }
+            
+            // Wenn alle Versuche fehlgeschlagen sind
+            if let error = lastError {
+                let nsError = error as NSError
+                switch nsError.code {
+                case StorageErrorCode.quotaExceeded.rawValue:
+                    throw StorageError.quotaExceeded
+                case StorageErrorCode.retryLimitExceeded.rawValue:
+                    throw StorageError.networkError
+                case StorageErrorCode.unauthorized.rawValue:
+                    logger.error("Berechtigungsfehler: \(error.localizedDescription)")
+                    throw StorageError.uploadFailed("Keine Berechtigung für den Zugriff auf den angegebenen Pfad. Bitte prüfe die Firebase Storage Regeln.")
+                default:
+                    logger.error("Hochladefehler (\(nsError.code)): \(error.localizedDescription)")
+                    throw StorageError.uploadFailed(error.localizedDescription)
+                }
+            }
+            
+            throw StorageError.uploadFailed("Upload nach \(maxRetries) Versuchen fehlgeschlagen")
+        } catch {
+            logger.error("Unerwarteter Fehler beim Upload: \(error.localizedDescription)")
+            throw error
         }
     }
     
