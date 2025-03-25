@@ -251,6 +251,62 @@ class CoreDataManager {
                     }
                     entity.imageRelationship = NSSet(array: imageEntities)
                 }
+                // Wenn entry.images nil ist, aber wir haben URLs und/oder lokale Pfade, erstellen wir Image-Objekte
+                else if (entry.imageURLs != nil && !entry.imageURLs!.isEmpty) || 
+                        (entry.localImagePaths != nil && !entry.localImagePaths!.isEmpty) {
+                    
+                    // Remove old images
+                    if let oldImages = entity.imageRelationship as? Set<ImageEntity> {
+                        for image in oldImages {
+                            context.delete(image)
+                        }
+                    }
+                    
+                    var imageEntities: [ImageEntity] = []
+                    
+                    // Wenn wir sowohl URLs als auch Pfade haben und die Anzahl übereinstimmt, kombinieren wir sie
+                    if let urls = entry.imageURLs, let paths = entry.localImagePaths, urls.count == paths.count {
+                        for i in 0..<urls.count {
+                            let imageEntity = ImageEntity(context: context,
+                                                        id: UUID().uuidString,
+                                                        url: urls[i],
+                                                        localPath: paths[i])
+                            imageEntity.uploadDate = Date()
+                            imageEntity.journalEntry = entity
+                            imageEntities.append(imageEntity)
+                        }
+                    } 
+                    // Andernfalls erstellen wir separate Einträge
+                    else {
+                        // URLs verarbeiten
+                        if let urls = entry.imageURLs {
+                            for url in urls {
+                                let imageEntity = ImageEntity(context: context,
+                                                           id: UUID().uuidString,
+                                                           url: url,
+                                                           localPath: nil)
+                                imageEntity.uploadDate = Date()
+                                imageEntity.journalEntry = entity
+                                imageEntities.append(imageEntity)
+                            }
+                        }
+                        
+                        // Lokale Pfade verarbeiten
+                        if let paths = entry.localImagePaths {
+                            for path in paths {
+                                let imageEntity = ImageEntity(context: context,
+                                                           id: UUID().uuidString,
+                                                           url: nil,
+                                                           localPath: path)
+                                imageEntity.uploadDate = Date()
+                                imageEntity.journalEntry = entity
+                                imageEntities.append(imageEntity)
+                            }
+                        }
+                    }
+                    
+                    entity.imageRelationship = NSSet(array: imageEntities)
+                }
                 
                 // Handle learning nugget
                 if let nugget = entry.learningNugget {
