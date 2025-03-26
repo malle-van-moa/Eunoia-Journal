@@ -237,10 +237,14 @@ struct JournalEntryRow: View {
     
     private var completionPercentage: Double {
         var filledFields = 0
+        var totalFields = 3
+        
         if !entry.gratitude.isEmpty { filledFields += 1 }
         if !entry.highlight.isEmpty { filledFields += 1 }
         if !entry.learning.isEmpty { filledFields += 1 }
-        return Double(filledFields) / 3.0
+        
+        // Sichere Umwandlung, um Divisionen durch Null zu vermeiden
+        return totalFields > 0 ? Double(filledFields) / Double(totalFields) : 0
     }
     
     private var imageCount: Int {
@@ -285,10 +289,13 @@ struct JournalEntryRow: View {
                         .fill(Color(.systemGray5))
                         .frame(height: 4)
                     
-                    // Fortschritt
+                    // Fortschritt - mit Sicherheitsüberprüfung
+                    let percentage = completionPercentage.isNaN ? 0 : min(1, max(0, completionPercentage))
+                    let width = geometry.size.width * percentage
+                    
                     RoundedRectangle(cornerRadius: 4)
                         .fill(completionColor)
-                        .frame(width: geometry.size.width * completionPercentage, height: 4)
+                        .frame(width: width, height: 4)
                 }
             }
             .frame(height: 4)
@@ -308,10 +315,18 @@ struct JournalEntryRow: View {
                 )
                 
                 FieldIcon(
-                    icon: "lightbulb.fill",
+                    icon: "book.fill",
                     label: "Lernen",
                     isFilled: !entry.learning.isEmpty
                 )
+                
+                if entry.learningNugget != nil {
+                    FieldIcon(
+                        icon: "lightbulb.fill",
+                        label: "Lernimpuls",
+                        isFilled: true
+                    )
+                }
             }
         }
         .padding(.vertical, 8)

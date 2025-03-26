@@ -430,18 +430,6 @@ class JournalViewModel: ObservableObject {
             }
         }
         
-        // Wenn ein Learning vorhanden ist, aber kein LearningNugget, erstellen wir eines
-        if !entry.learning.isEmpty && entry.learningNugget == nil {
-            let nugget = LearningNugget(
-                userId: entry.userId,
-                category: .persönlichesWachstum,
-                title: "Lernimpuls",
-                content: entry.learning,
-                isAddedToJournal: true
-            )
-            entryToSave.learningNugget = nugget
-        }
-        
         // Set sync status based on network availability
         entryToSave.syncStatus = NetworkMonitor.shared.isConnected ? .synced : .pendingUpload
         
@@ -614,14 +602,14 @@ class JournalViewModel: ObservableObject {
     func addLearningNuggetToEntry() {
         guard var entry = currentEntry, let nugget = learningNugget else { return }
         
-        // Aktualisiere den Eintrag mit dem Learning Nugget und füge den Content zum Lernfeld hinzu
+        // Aktualisiere den Eintrag nur mit dem Learning Nugget, behalte das original Learning-Feld bei
         entry = JournalEntry(
             id: entry.id,
             userId: entry.userId,
             date: entry.date,
             gratitude: entry.gratitude,
             highlight: entry.highlight,
-            learning: nugget.content,
+            learning: entry.learning, // Behalte original learning bei, nicht mit nugget.content überschreiben
             learningNugget: nugget,
             lastModified: Date(),
             syncStatus: .pendingUpload,
@@ -629,7 +617,8 @@ class JournalViewModel: ObservableObject {
             content: entry.content,
             location: entry.location,
             imageURLs: entry.imageURLs,
-            localImagePaths: entry.localImagePaths
+            localImagePaths: entry.localImagePaths,
+            images: entry.images
         )
         
         // Aktualisiere den currentEntry und UI sofort

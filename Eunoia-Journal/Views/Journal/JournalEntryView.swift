@@ -41,28 +41,28 @@ struct JournalEntryView: View {
     }
     
     private func setupInitialState() {
-        if let entry = entry {
-            print("🔄 [SETUP] Initialisiere viewModel.currentEntry mit existierendem Entry (ID: \(entry.id ?? "unknown"))")
-            viewModel.currentEntry = JournalEntry(
-                id: entry.id,
-                userId: entry.userId,
-                date: entry.date,
-                gratitude: entry.gratitude,
-                highlight: entry.highlight,
-                learning: entry.learning,
-                learningNugget: entry.learningNugget,
-                lastModified: entry.lastModified,
-                syncStatus: entry.syncStatus,
-                title: entry.title,
-                content: entry.content,
-                location: entry.location,
-                imageURLs: entry.imageURLs,
-                localImagePaths: entry.localImagePaths,
-                images: entry.images
-            )
-        } else {
-            print("🔄 [SETUP] Erstelle neuen Entry")
-            Task { @MainActor in
+        Task { @MainActor in
+            if let entry = entry {
+                print("🔄 [SETUP] Initialisiere viewModel.currentEntry mit existierendem Entry (ID: \(entry.id ?? "unknown"))")
+                viewModel.currentEntry = JournalEntry(
+                    id: entry.id,
+                    userId: entry.userId,
+                    date: entry.date,
+                    gratitude: entry.gratitude,
+                    highlight: entry.highlight,
+                    learning: entry.learning,
+                    learningNugget: entry.learningNugget,
+                    lastModified: entry.lastModified,
+                    syncStatus: entry.syncStatus,
+                    title: entry.title,
+                    content: entry.content,
+                    location: entry.location,
+                    imageURLs: entry.imageURLs,
+                    localImagePaths: entry.localImagePaths,
+                    images: entry.images
+                )
+            } else {
+                print("🔄 [SETUP] Erstelle neuen Entry")
                 viewModel.createNewEntry()
             }
         }
@@ -210,14 +210,24 @@ struct JournalEntryView: View {
             learningNuggetSection
             imagesSection
         }
+        // Verbesserter Navigationsbereich mit explizitem Layout
+        .navigationBarTitleDisplayMode(.inline)
         .navigationTitle(navigationTitle)
-        .navigationBarItems(
-            leading: cancelButton,
-            trailing: HStack {
-                deleteButton
-                saveButton
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                cancelButton
+                    .padding(.top, 5) // Mehr Platz nach oben
             }
-        )
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 16) {
+                    deleteButton
+                    saveButton
+                }
+                .padding(.top, 5) // Mehr Platz nach oben
+            }
+        }
+        // Einstellungen für Sheet-Anzeigen
         .sheet(isPresented: $showingAISuggestions) {
             AISuggestionsView(
                 field: selectedField ?? .gratitude,
@@ -251,17 +261,16 @@ struct JournalEntryView: View {
                 }
             }
         }
-        .onAppear {
-            print("🔄 [VIEW] onAppear ausgelöst")
-            setupInitialState()
+        // Explizit keine Animation auf den TextEditor-Komponenten, nur auf Layoutänderungen
+        .transaction { transaction in
+            // Deaktiviere implizite Animationen für TextEditor
+            if transaction.animation != nil {
+                transaction.disablesAnimations = true
+            }
         }
         .task {
             print("🔄 [VIEW] task ausgelöst")
-            // Bei einem bestehenden Eintrag muss die vollständige Initialisierung durchgeführt werden
-            if entry != nil && viewModel.currentEntry == nil {
-                print("⚠️ [VIEW] Wiederhole setupInitialState, da currentEntry nil ist")
-                setupInitialState()
-            }
+            setupInitialState()
         }
         .onChange(of: viewModel.currentEntry) { newEntry in
             if let entry = newEntry {
@@ -327,18 +336,32 @@ struct JournalEntryView: View {
     private var learningNuggetSection: some View {
         Group {
             if let nugget = viewModel.learningNugget ?? entry?.learningNugget {
-                LearningNuggetView(nugget: nugget) {
-                    // Setze das aktuelle Learning Nugget zurück, damit ein neues geladen werden kann
-                    viewModel.learningNugget = nil
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Lernimpuls")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .padding(.horizontal)
                     
-                    // Verzögere das Öffnen des Auswahlfensters, damit die onReceive-Handler Zeit haben
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        showingLearningNugget = true
+                    LearningNuggetView(nugget: nugget) {
+                        // Vermeide direkte Zustandsänderung in View-Builder
+                        reloadLearningNugget()
                     }
                 }
             } else {
-                learningNuggetButton
+                Section(header: Text("Lernimpuls")) {
+                    learningNuggetButton
+                }
             }
+        }
+    }
+    
+    private func reloadLearningNugget() {
+        // Setze das aktuelle Learning Nugget zurück, damit ein neues geladen werden kann
+        viewModel.learningNugget = nil
+        
+        // Verzögere das Öffnen des Auswahlfensters, damit die onReceive-Handler Zeit haben
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.showingLearningNugget = true
         }
     }
     
@@ -405,33 +428,36 @@ struct JournalEntryView: View {
                 title: "Wofür bist du heute dankbar?",
                 text: $gratitude,
                 systemImage: "heart.fill",
-                color: .red
-            ) {
-                selectedField = .gratitude
-                showingAISuggestions = true
-            }
+                color: .red,
+                onSuggestionTap: {
+                    selectedField = .gratitude
+                    showingAISuggestions = true
+                }
+            )
             
-            // Highlight Section
+            // Highlight Section - wieder standard
             JournalSection(
                 title: "Was war dein Highlight heute?",
                 text: $highlight,
                 systemImage: "star.fill",
-                color: .yellow
-            ) {
-                selectedField = .highlight
-                showingAISuggestions = true
-            }
+                color: .yellow,
+                onSuggestionTap: {
+                    selectedField = .highlight
+                    showingAISuggestions = true
+                }
+            )
             
             // Learning Section
             JournalSection(
                 title: "Was hast du heute gelernt?",
                 text: $learning,
                 systemImage: "book.fill",
-                color: .blue
-            ) {
-                selectedField = .learning
-                showingAISuggestions = true
-            }
+                color: .blue,
+                onSuggestionTap: {
+                    selectedField = .learning
+                    showingAISuggestions = true
+                }
+            )
         }
     }
     
@@ -584,11 +610,6 @@ struct JournalEntryView: View {
         let selectedCount = selectedImages.count
         let currentImageCount = urlCount + selectedCount
         
-        // Initialisiere currentEntry mit entry, falls noch nicht geschehen
-        if viewModel.currentEntry == nil && entry != nil {
-            viewModel.currentEntry = entry
-        }
-        
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Bilder")
@@ -604,7 +625,7 @@ struct JournalEntryView: View {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.secondary.opacity(0.1))
                     )
-                    .animation(.easeInOut, value: currentImageCount)
+                    .transition(.opacity)
                     .id("counter-\(currentImageCount)") // Forciert View-Update bei Counter-Änderungen
                 
                 Spacer()
@@ -670,9 +691,7 @@ struct JournalEntryView: View {
                                     Button(action: {
                                         // Entferne Bild aus ausgewählten Bildern
                                         selectedImages.remove(at: index)
-                                        
-                                        // Aktualisiere die UI explizit durch Senden eines objectWillChange-Events
-                                        viewModel.objectWillChange.send()
+                                        // Kein viewModel.objectWillChange.send() hier
                                     }) {
                                         Image(systemName: "xmark.circle.fill")
                                             .foregroundColor(.white)
@@ -718,9 +737,12 @@ struct JournalEntryView: View {
             let urlCount = viewModel.currentEntry?.imageURLs?.count ?? 0
             let selectedCount = newSelectedImages.count
             print("📊 [IMAGE-SELECTION] Neue Bildauswahl: URLs: \(urlCount), ausstehend: \(selectedCount), gesamt: \(urlCount + selectedCount)/\(maxImages)")
-            
-            // Aktualisiere die UI explizit durch Senden eines objectWillChange-Events
-            viewModel.objectWillChange.send()
+        }
+        .onAppear {
+            // Initialisiere currentEntry mit entry, falls noch nicht geschehen - hierhin verschoben
+            if viewModel.currentEntry == nil && entry != nil {
+                viewModel.currentEntry = entry
+            }
         }
     }
     
@@ -866,6 +888,7 @@ struct JournalSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Header
             HStack {
                 Image(systemName: systemImage)
                     .foregroundColor(color)
@@ -878,15 +901,74 @@ struct JournalSection: View {
                 }
             }
             
-            TextEditor(text: $text)
-                .frame(height: 100)
-                .padding(8)
-                .background(Color(.systemBackground))
-                .cornerRadius(8)
+            // Vereinfachter TextEditor ohne spezielle Features, die zu Decodierungsfehlern führen könnten
+            if #available(iOS 16.0, *) {
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemBackground))
+                    
+                    TextEditor(text: $text)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.clear)
+                        .padding(8)
+                }
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(Color.gray.opacity(0.2))
                 )
+                .frame(height: 100)
+            } else {
+                // Fallback für ältere iOS-Versionen
+                PlainTextEditor(text: $text)
+                    .frame(height: 100)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.gray.opacity(0.2))
+                    )
+            }
+        }
+    }
+}
+
+// Vereinfachte PlainTextEditor-Implementierung
+struct PlainTextEditor: UIViewRepresentable {
+    @Binding var text: String
+    
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.font = UIFont.preferredFont(forTextStyle: .body)
+        textView.isScrollEnabled = true
+        textView.isEditable = true
+        textView.backgroundColor = .clear
+        textView.textContainerInset = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+        
+        // Einfache Konfiguration ohne potenziell problematische Auto-Layout-Einstellungen
+        return textView
+    }
+    
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        // Einfache Aktualisierung ohne komplexe Cursor-Positionserhaltung
+        if uiView.text != text {
+            uiView.text = text
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UITextViewDelegate {
+        var parent: PlainTextEditor
+        
+        init(_ parent: PlainTextEditor) {
+            self.parent = parent
+        }
+        
+        func textViewDidChange(_ textView: UITextView) {
+            parent.text = textView.text
         }
     }
 }
@@ -1179,6 +1261,40 @@ struct LearningNuggetPickerView: View {
     private func clearError() {
         identifiableError = nil
         viewModel.error = nil
+    }
+}
+
+// Vereinfachter optimierter TextEditor ohne Layout-Probleme
+struct EnhancedTextEditor: View {
+    @Binding var text: String
+    
+    var body: some View {
+        if #available(iOS 16.0, *) {
+            ZStack {
+                Rectangle()
+                    .fill(Color(.systemBackground))
+                    .cornerRadius(8)
+                
+                TextEditor(text: $text)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    .padding(8)
+            }
+            .frame(height: 100)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.2))
+            )
+        } else {
+            PlainTextEditor(text: $text)
+                .frame(height: 100)
+                .background(Color(.systemBackground))
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.2))
+                )
+        }
     }
 }
 
